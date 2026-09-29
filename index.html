@@ -1,0 +1,3397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Turbo Track Racing</title>
+    <meta name="description" content="High-speed arcade racing game optimized for web and YouTube Playables.">
+    <meta property="og:title" content="Turbo Track Racing">
+    <meta property="og:description" content="High-speed arcade racing game optimized for web and YouTube Playables.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <style>
+        :root {
+            --neon-blue: #00f2ff;
+            --neon-pink: #ff00ea;
+            --neon-yellow: #f4ff00;
+            --neon-green: #00ff66;
+            --road-grey: #333;
+        }
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: #111;
+        }
+        /* UI Overlays */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.88);
+            z-index: 100;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 20px;
+        }
+        .hidden { display: none !important; }
+
+        h1 { 
+            font-size: clamp(2rem, 7vw, 4.2rem); 
+            margin: 0 0 10px 0; 
+            text-transform: uppercase; 
+            letter-spacing: 6px; 
+            color: var(--neon-blue); 
+            text-shadow: 0 0 20px var(--neon-blue); 
+            font-style: italic; 
+            font-weight: 900;
+        }
+        .subtitle {
+            font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+            color: #ccc;
+            letter-spacing: 2px;
+            margin-bottom: 25px;
+        }
+        .btn {
+            padding: 12px 36px;
+            font-size: clamp(1rem, 2.5vw, 1.25rem);
+            margin: 8px;
+            cursor: pointer;
+            background: transparent;
+            border: 3px solid var(--neon-pink);
+            color: var(--neon-pink);
+            text-transform: uppercase;
+            transition: transform 0.15s, background-color 0.15s, box-shadow 0.15s, color 0.15s;
+            border-radius: 0;
+            font-weight: 900;
+            letter-spacing: 2px;
+            clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+            touch-action: manipulation;
+            pointer-events: auto;
+            min-width: 200px;
+        }
+        .btn:hover, .btn:active {
+            background: var(--neon-pink);
+            color: #000;
+            box-shadow: 0 0 25px var(--neon-pink);
+            transform: scale(1.04);
+        }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: max(10px, env(safe-area-inset-top, 10px)) max(12px, env(safe-area-inset-right, 12px)) 10px max(12px, env(safe-area-inset-left, 12px));
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            align-items: start;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            pointer-events: none;
+            z-index: 50;
+            gap: 8px;
+        }
+        .hud-left { display: flex; flex-direction: column; gap: 3px; }
+        .hud-center { text-align: center; font-weight: bold; font-size: 0.75rem; color: var(--neon-pink); letter-spacing: 2px; }
+        .hud-right { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 3px; 
+            align-items: flex-end; 
+            margin-right: 48px; /* Room for pause button */
+        }
+        .hud-item { 
+            background: rgba(0,0,0,0.65); 
+            padding: 4px 10px; 
+            border-radius: 2px; 
+            border-left: 3px solid var(--neon-blue); 
+            font-size: clamp(0.65rem, 1.8vw, 0.75rem); 
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        }
+        
+        #dashboard {
+            position: absolute;
+            bottom: max(20px, env(safe-area-inset-bottom, 20px));
+            right: max(20px, env(safe-area-inset-right, 20px));
+            text-align: right;
+            z-index: 50;
+            pointer-events: none;
+            background: linear-gradient(135deg, rgba(12, 16, 28, 0.88), rgba(6, 8, 14, 0.92));
+            border: 1px solid rgba(0, 242, 255, 0.35);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 242, 255, 0.08);
+            padding: 8px 12px;
+            border-radius: 8px;
+            border-right: 4px solid var(--neon-blue);
+            min-width: 160px;
+        }
+        .speed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .gear-badge {
+            background: rgba(0, 242, 255, 0.15);
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            font-weight: 900;
+            font-size: 0.8rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            font-family: monospace;
+        }
+        .speed-val { font-size: clamp(1.8rem, 4.5vw, 2.4rem); font-weight: 900; line-height: 1; color: #fff; text-shadow: 0 0 12px rgba(255,255,255,0.5); }
+        .rpm-text {
+            font-size: 0.6rem;
+            color: #aaa;
+            font-family: monospace;
+            margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .rpm-bar-container {
+            width: 100%;
+            height: 6px;
+            background: #181c24;
+            border: 1px solid #333;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+        #rpm-bar-fill {
+            height: 100%;
+            width: 15%;
+            background: linear-gradient(90deg, #00ff66 0%, #ffcc00 65%, #ff0033 90%);
+            box-shadow: 0 0 8px #ffcc00;
+            transition: width 0.05s linear;
+        }
+        .gauge-container { width: 100%; height: 7px; background: #222; border: 1px solid #444; margin-top: 3px; position: relative; overflow: hidden; border-radius: 2px; }
+        .gauge-fill { height: 100%; transition: width 0.08s linear; }
+        #fuel-bar { background: var(--neon-yellow); box-shadow: 0 0 8px var(--neon-yellow); }
+        #nitro-bar { background: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
+
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute;
+            bottom: max(15px, env(safe-area-inset-bottom, 15px));
+            left: max(15px, env(safe-area-inset-left, 15px));
+            right: max(15px, env(safe-area-inset-right, 15px));
+            display: none;
+            justify-content: space-between;
+            align-items: flex-end;
+            z-index: 90;
+            pointer-events: none;
+        }
+        .ctrl-group {
+            display: flex;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        .ctrl-btn {
+            width: clamp(56px, 14vw, 75px);
+            height: clamp(56px, 14vw, 75px);
+            background: rgba(20, 20, 30, 0.65);
+            border: 2px solid rgba(0, 242, 255, 0.45);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-weight: 900;
+            font-size: clamp(1.2rem, 3.8vw, 1.6rem);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            transition: transform 0.08s, background-color 0.08s;
+        }
+        .ctrl-btn:active { 
+            background: rgba(0, 242, 255, 0.35); 
+            transform: scale(0.9); 
+        }
+
+        #fps-counter { 
+            position: absolute; 
+            top: max(55px, calc(env(safe-area-inset-top, 10px) + 45px)); 
+            left: max(12px, env(safe-area-inset-left, 12px)); 
+            color: var(--neon-green); 
+            font-size: 11px; 
+            opacity: 0.85; 
+            font-family: 'Courier New', monospace; 
+            z-index: 60;
+            pointer-events: none;
+        }
+        #pause-btn { 
+            position: absolute; 
+            top: max(10px, env(safe-area-inset-top, 10px)); 
+            right: max(12px, env(safe-area-inset-right, 12px)); 
+            width: 38px; 
+            height: 38px; 
+            background: rgba(0,0,0,0.7); 
+            border: 2px solid #fff; 
+            color: #fff; 
+            cursor: pointer; 
+            pointer-events: auto; 
+            z-index: 160; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            font-size: 1.1rem; 
+            border-radius: 6px;
+            touch-action: manipulation;
+            transition: transform 0.1s, background-color 0.1s;
+        }
+        #pause-btn:active {
+            transform: scale(0.92);
+            background: rgba(255,255,255,0.2);
+        }
+
+        /* Level Complete / Failed Styles */
+        @keyframes levelCompleteAnim {
+            0% { transform: scale(0) rotate(-180deg); opacity: 0; }
+            50% { transform: scale(1.2) rotate(10deg); opacity: 1; }
+            70% { transform: scale(0.92) rotate(-5deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { text-shadow: 0 0 25px var(--neon-yellow), 0 0 50px var(--neon-yellow); }
+            50% { text-shadow: 0 0 45px var(--neon-yellow), 0 0 80px var(--neon-yellow), 0 0 15px #fff; }
+        }
+        .level-complete-title {
+            animation: levelCompleteAnim 0.8s ease-out, pulseGlow 1.5s ease-in-out infinite 0.8s;
+            font-size: clamp(2rem, 8vw, 4.2rem);
+            color: var(--neon-yellow);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            font-weight: 900;
+            font-style: italic;
+            margin: 0 0 10px 0;
+        }
+        @keyframes failShake {
+            0%, 100% { transform: translateX(0); }
+            15%, 45%, 75% { transform: translateX(-12px); }
+            30%, 60%, 90% { transform: translateX(12px); }
+        }
+        .level-failed-title {
+            animation: failShake 0.5s ease-in-out;
+            font-size: clamp(2rem, 8vw, 4.2rem);
+            color: #ff3333;
+            text-shadow: 0 0 30px #ff0000;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            font-weight: 900;
+            font-style: italic;
+            margin: 0 0 10px 0;
+        }
+        .stat-card {
+            background: rgba(10, 15, 25, 0.85);
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            border-radius: 8px;
+            padding: 12px 18px;
+            margin: 15px 0 22px 0;
+            max-width: 360px;
+            width: 100%;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            font-family: 'Courier New', monospace;
+            font-size: clamp(0.85rem, 2.2vw, 1rem);
+        }
+        .stat-row.bonus { color: var(--neon-yellow); font-weight: bold; }
+        .stat-row.total { color: var(--neon-blue); font-weight: bold; font-size: 1.25rem; border-bottom: none; border-top: 2px solid var(--neon-blue); margin-top: 5px; padding-top: 8px; }
+        .mission-badge {
+            display: inline-block;
+            background: rgba(0,0,0,0.7);
+            padding: 2px 7px;
+            border-radius: 3px;
+            margin: 0 2px;
+            font-size: 0.65rem;
+            white-space: nowrap;
+        }
+
+        /* Professional Menu & Garage Styles */
+        .menu-top-bar {
+            position: absolute;
+            top: max(12px, env(safe-area-inset-top, 12px));
+            left: max(16px, env(safe-area-inset-left, 16px));
+            right: max(16px, env(safe-area-inset-right, 16px));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 110;
+            pointer-events: auto;
+        }
+        .user-stats-strip {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+            font-family: 'Courier New', monospace;
+            color: #ccc;
+        }
+        .user-stat-val {
+            color: var(--neon-yellow);
+            font-weight: bold;
+        }
+        .icon-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            transition: 0.15s;
+        }
+        .icon-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: #fff;
+        }
+
+        /* Garage Paint Selector */
+        .paint-selector-panel {
+            background: rgba(12, 16, 28, 0.75);
+            border: 1px solid rgba(0, 242, 255, 0.25);
+            padding: 10px 18px;
+            border-radius: 8px;
+            margin: 14px 0 18px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            max-width: 420px;
+            width: 100%;
+        }
+        .paint-label {
+            font-size: 0.75rem;
+            letter-spacing: 2px;
+            color: var(--neon-blue);
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+        .paint-swatches {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        .paint-swatch {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: transform 0.15s, border-color 0.15s;
+        }
+        .paint-swatch:hover, .paint-swatch.active {
+            transform: scale(1.22);
+            border-color: #fff;
+            box-shadow: 0 0 12px currentColor;
+        }
+
+        /* 3-2-1 START NOW Countdown Gantry */
+        #countdown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 180;
+            pointer-events: none;
+            background: rgba(0, 0, 0, 0.45);
+            box-sizing: border-box;
+            padding: 16px;
+        }
+        #countdown-gantry {
+            display: flex;
+            gap: 16px;
+            background: #111;
+            padding: 10px 22px;
+            border-radius: 12px;
+            border: 3px solid #333;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+            margin: 0 auto 16px auto;
+        }
+        .gantry-light {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #222;
+            border: 2px solid #444;
+            transition: background 0.1s, box-shadow 0.1s;
+        }
+        .gantry-light.red.active {
+            background: #ff0033;
+            box-shadow: 0 0 25px #ff0033, 0 0 50px #ff0033;
+        }
+        .gantry-light.yellow.active {
+            background: #ffcc00;
+            box-shadow: 0 0 25px #ffcc00, 0 0 50px #ffcc00;
+        }
+        .gantry-light.green.active {
+            background: #00ff66;
+            box-shadow: 0 0 35px #00ff66, 0 0 70px #00ff66;
+        }
+        #countdown-text {
+            font-size: clamp(2.4rem, 8.5vw, 4.6rem);
+            font-weight: 900;
+            font-style: italic;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #fff;
+            text-shadow: 0 0 30px var(--neon-yellow);
+            animation: cdPulse 0.4s ease-out;
+            margin: 0 auto;
+            line-height: 1.1;
+            text-align: center;
+            width: 100%;
+            max-width: 90vw;
+            display: block;
+        }
+        @keyframes cdPulse {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        #countdown-subtext {
+            font-size: clamp(0.85rem, 3.2vw, 1.3rem);
+            letter-spacing: 2px;
+            color: var(--neon-blue);
+            margin-top: 10px;
+            font-weight: 800;
+            text-align: center;
+            width: 100%;
+            display: block;
+        }
+
+        /* 100+ Level Select Modal */
+        #menu-levelselect {
+            padding: max(16px, env(safe-area-inset-top, 16px)) max(16px, env(safe-area-inset-right, 16px)) max(16px, env(safe-area-inset-bottom, 16px)) max(16px, env(safe-area-inset-left, 16px));
+            justify-content: flex-start;
+            overflow-y: auto;
+        }
+        .level-select-container {
+            max-width: 900px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: auto;
+        }
+        .chapter-tabs-strip {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            max-width: 100%;
+            padding: 8px 4px 12px 4px;
+            scrollbar-width: thin;
+        }
+        .chapter-tab-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #aaa;
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: 0.15s;
+        }
+        .chapter-tab-btn.active, .chapter-tab-btn:hover {
+            background: var(--neon-blue);
+            color: #000;
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+        }
+        .levels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+            width: 100%;
+            margin: 15px 0 25px 0;
+            max-height: 52vh;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        .level-card {
+            background: rgba(15, 20, 32, 0.85);
+            border: 1px solid rgba(0, 242, 255, 0.25);
+            border-radius: 6px;
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+            position: relative;
+        }
+        .level-card:hover:not(.locked) {
+            transform: translateY(-3px);
+            border-color: var(--neon-pink);
+            box-shadow: 0 4px 18px rgba(255, 0, 234, 0.4);
+        }
+        .level-card.locked {
+            opacity: 0.45;
+            cursor: not-allowed;
+            border-color: #333;
+            background: rgba(10, 10, 15, 0.7);
+        }
+        .level-card.active-unlocked {
+            border-color: var(--neon-yellow);
+            box-shadow: 0 0 12px rgba(244, 255, 0, 0.3);
+        }
+        .level-card-num {
+            font-size: 1.4rem;
+            font-weight: 900;
+            font-style: italic;
+            color: #fff;
+            line-height: 1;
+        }
+        .level-card-name {
+            font-size: 0.65rem;
+            color: #bbb;
+            text-transform: uppercase;
+            margin-top: 4px;
+            letter-spacing: 1px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+        }
+        .level-card-badge {
+            margin-top: 6px;
+            font-size: 0.6rem;
+            color: var(--neon-blue);
+            font-family: monospace;
+        }
+
+        /* Responsive Breakpoints */
+        @media (hover: none) and (pointer: coarse), (max-width: 860px) {
+            #mobile-controls { 
+                display: flex; 
+            }
+            #dashboard { 
+                top: auto !important;
+                bottom: clamp(75px, 12vh, 92px) !important; 
+                right: max(6px, env(safe-area-inset-right, 6px)) !important;
+                height: auto !important;
+                width: auto !important;
+                min-width: 92px !important;
+                max-width: 104px !important;
+                padding: 3px 6px !important;
+                border-radius: 6px !important;
+                background: rgba(10, 14, 24, 0.78) !important;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
+                backdrop-filter: blur(4px);
+            }
+            .speed-val {
+                font-size: 1.25rem !important;
+            }
+            .gear-badge {
+                font-size: 0.62rem !important;
+                padding: 1px 4px !important;
+            }
+            .rpm-text {
+                font-size: 0.50rem !important;
+                margin-top: 2px !important;
+            }
+            .rpm-bar-container {
+                height: 4px !important;
+                margin-top: 1px !important;
+            }
+            .gauge-container {
+                height: 4px !important;
+                margin-top: 2px !important;
+            }
+            .levels-grid {
+                grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+                gap: 8px;
+            }
+        }
+        @media (max-width: 600px) {
+            #hud { 
+                grid-template-columns: 1fr 1fr;
+            }
+            .hud-center { 
+                display: none; 
+            }
+            .menu-top-bar {
+                flex-direction: column;
+                gap: 8px;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="fps-counter">FPS: 60</div>
+    <div id="pause-btn" title="Pause Game">⏸</div>
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div class="hud-left">
+            <div class="hud-item">LVL: <span id="val-level">1</span></div>
+            <div class="hud-item">SCORE: <span id="val-score">0</span></div>
+            <div class="hud-item" style="border-color: var(--neon-pink)">BEST: <span id="val-best">0</span></div>
+            <div class="hud-item" style="border-color: var(--neon-blue)">NITRO: <span id="val-coins">100</span>%</div>
+        </div>
+        <div class="hud-center">
+            <div id="level-name">NEON CITY</div>
+            <div id="mission-progress" style="margin-top: 4px; font-size: 0.65rem; letter-spacing: 1px;">
+                <span class="mission-badge">📏 <span id="val-remaining">2000</span>m</span>
+                <span class="mission-badge" style="border-color: #00f2ff; color: #00f2ff;">⚡ TURBO SPRINT</span>
+            </div>
+        </div>
+        <div class="hud-right">
+            <div class="hud-item">DIST: <span id="val-dist">0</span>m</div>
+            <div class="hud-item" id="val-racepos" style="border-color: var(--neon-blue);">⚡ NITRO: <span id="race-pos">100%</span></div>
+        </div>
+    </div>
+
+    <!-- Pro Automotive Dashboard -->
+    <div id="dashboard" class="hidden">
+        <div class="speed-header">
+            <span class="gear-badge" id="val-gear">GEAR 1</span>
+            <div class="speed-val"><span id="val-speed">0</span></div>
+        </div>
+        <div style="font-size: 0.55rem; color: #888; font-family: monospace; letter-spacing: 1px;">KM / H</div>
+        
+        <div class="rpm-text">
+            <span>TACHO</span>
+            <span id="val-rpm" style="color: #ffcc00;">1000 RPM</span>
+        </div>
+        <div class="rpm-bar-container">
+            <div id="rpm-bar-fill"></div>
+        </div>
+
+        <div style="font-size: 0.55rem; color: var(--neon-blue); text-align: left; font-family: monospace; margin-top: 5px;">NITRO BOOST</div>
+        <div class="gauge-container"><div id="nitro-bar" class="gauge-fill"></div></div>
+
+        <div style="font-size: 0.55rem; color: var(--neon-yellow); text-align: left; margin-top: 4px; font-family: monospace;">FUEL LEVEL</div>
+        <div class="gauge-container"><div id="fuel-bar" class="gauge-fill"></div></div>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu-main" class="overlay">
+        <!-- Top Navigation Bar -->
+        <div class="menu-top-bar">
+            <div class="user-stats-strip">
+                <div>STAGE: <span class="user-stat-val" id="top-stage">1/100+</span></div>
+                <div>COINS: <span class="user-stat-val" id="top-coins">0</span></div>
+                <div>BEST: <span class="user-stat-val" id="top-best">0</span></div>
+            </div>
+            <button class="icon-btn" id="sound-toggle-btn" title="Toggle Sound">🔊 SOUND: ON</button>
+        </div>
+
+        <div style="color: var(--neon-pink); font-weight: bold; margin-bottom: 6px; letter-spacing: 4px; font-size: clamp(0.75rem, 2vw, 0.9rem);">
+            WORLD RACING FEDERATION
+        </div>
+        <h1>TURBO TRACK</h1>
+        <div class="subtitle" style="margin-bottom: 12px;">
+            100+ GRAND PRIX STAGES & HYPERCAR CHALLENGE
+        </div>
+
+        <!-- Garage Car Customizer (Paint Shop) -->
+        <div class="paint-selector-panel">
+            <div class="paint-label">🎨 GARAGE: CUSTOMIZE YOUR CAR</div>
+            <div class="paint-swatches">
+                <div class="paint-swatch active" data-color="#00f2ff" style="background: #00f2ff; color: #00f2ff;" title="Cyber Cyan"></div>
+                <div class="paint-swatch" data-color="#ff0033" style="background: #ff0033; color: #ff0033;" title="Crimson Fury"></div>
+                <div class="paint-swatch" data-color="#ffd700" style="background: #ffd700; color: #ffd700;" title="Solar Gold"></div>
+                <div class="paint-swatch" data-color="#a855f7" style="background: #a855f7; color: #a855f7;" title="Hyper Purple"></div>
+                <div class="paint-swatch" data-color="#00ff66" style="background: #00ff66; color: #00ff66;" title="Neon Venom"></div>
+                <div class="paint-swatch" data-color="#2a324b" style="background: #2a324b; color: #2a324b;" title="Stealth Obsidian"></div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 320px;">
+            <button class="btn" id="start-race-btn" style="width: 100%;">🏁 Start Race</button>
+            <button class="btn" id="continue-btn" style="border-color: var(--neon-blue); color: var(--neon-blue); width: 100%;">⚡ Continue (Stage <span id="menu-continue-lvl">1</span>)</button>
+            <button class="btn" id="select-level-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow); width: 100%;">🗺️ Select Level (1-100+)</button>
+        </div>
+
+        <div style="margin-top:16px; font-size: clamp(0.7rem, 1.8vw, 0.8rem); color: #888; line-height: 1.5; text-align: center;">
+            W / UP: Gas · S / DOWN: Brake · A/D: Steer · SPACE: Nitro<br>
+            Mobile: Touch Controls with Gas, Brake & Steering
+        </div>
+    </div>
+
+    <!-- 100+ Level Select Modal -->
+    <div id="menu-levelselect" class="overlay hidden">
+        <div class="level-select-container">
+            <h1 style="font-size: clamp(1.6rem, 5vw, 2.8rem); margin-bottom: 4px;">CHAMPIONSHIP STAGES</h1>
+            <div style="font-size: 0.8rem; color: var(--neon-blue); letter-spacing: 2px; margin-bottom: 12px;">100+ PROFESSIONAL RACING CIRCUITS</div>
+
+            <!-- World / Chapter Tabs -->
+            <div class="chapter-tabs-strip" id="chapter-tabs-strip">
+                <!-- Dynamically populated or rendered -->
+            </div>
+
+            <!-- Levels Grid (10 levels per chapter) -->
+            <div class="levels-grid" id="levels-grid">
+                <!-- Dynamically populated -->
+            </div>
+
+            <button class="btn" id="close-levelselect-btn" style="border-color: #888; color: #bbb; min-width: 180px;">Back to Menu</button>
+        </div>
+    </div>
+
+    <!-- 3-2-1 START NOW Countdown Gantry Overlay -->
+    <div id="countdown-overlay" class="hidden">
+        <div id="countdown-gantry">
+            <div class="gantry-light red" id="gantry-red"></div>
+            <div class="gantry-light yellow" id="gantry-yellow"></div>
+            <div class="gantry-light green" id="gantry-green"></div>
+        </div>
+        <div id="countdown-text">3</div>
+        <div id="countdown-subtext">REV YOUR ENGINES!</div>
+    </div>
+
+    <!-- Pause Menu -->
+    <div id="menu-pause" class="overlay hidden">
+        <h1>PAUSED</h1>
+        <button class="btn" id="pause-resume-btn">Resume</button>
+        <button class="btn" id="pause-quit-btn" style="border-color: #888; color: #bbb;">Main Menu</button>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="menu-gameover" class="overlay hidden">
+        <h1 style="color: var(--neon-pink);">WRECKED!</h1>
+        <div class="stat-card" id="final-stats" style="margin: 15px 0;"></div>
+        <button class="btn" id="go-retry-btn">Try Again</button>
+        <button class="btn" id="go-menu-btn" style="border-color: #888; color: #bbb;">Main Menu</button>
+    </div>
+
+    <!-- Level Complete Menu -->
+    <div id="menu-levelcomplete" class="overlay hidden">
+        <div class="level-complete-title">LEVEL COMPLETE!</div>
+        <div class="stat-card">
+            <div class="stat-row"><span>Level</span><span id="lc-level">1</span></div>
+            <div class="stat-row"><span>Distance</span><span id="lc-distance">0m</span></div>
+            <div class="stat-row"><span>Coins Collected</span><span id="lc-coins">0</span></div>
+            <div class="stat-row"><span>Score Earned</span><span id="lc-score">0</span></div>
+            <div class="stat-row bonus"><span>Level Bonus</span><span>+500</span></div>
+            <div class="stat-row total"><span>Total Score</span><span id="lc-total">0</span></div>
+        </div>
+        <div id="lc-allcomplete" class="hidden" style="color: var(--neon-yellow); font-size: 1.2rem; margin-bottom: 15px; font-weight: bold; text-shadow: 0 0 15px var(--neon-yellow);">
+            🏆 ALL 20 LEVELS CLEARED! 🏆
+        </div>
+        <div>
+            <button class="btn" id="lc-next-btn" style="border-color: var(--neon-yellow); color: var(--neon-yellow);">Next Level</button>
+            <button class="btn" id="lc-menu-btn" style="border-color: #888; color: #bbb;">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Level Failed Menu -->
+    <div id="menu-levelfailed" class="overlay hidden">
+        <div class="level-failed-title">LEVEL FAILED!</div>
+        <div id="level-failed-reason" style="margin: 10px 0 15px 0; font-size: 1.2rem; color: #ff6666; font-weight: bold; letter-spacing: 1px;"></div>
+        <div class="stat-card">
+            <div class="stat-row"><span>Level</span><span id="lf-level">1</span></div>
+            <div class="stat-row"><span>Distance</span><span id="lf-distance">0m</span></div>
+            <div class="stat-row"><span>Coins</span><span id="lf-coins">0</span></div>
+            <div class="stat-row"><span>Crashes</span><span id="lf-crashes">0</span></div>
+        </div>
+        <div>
+            <button class="btn" id="lf-retry-btn" style="border-color: var(--neon-blue); color: var(--neon-blue);">Restart Level</button>
+            <button class="btn" id="lf-menu-btn" style="border-color: #888; color: #bbb;">Main Menu</button>
+        </div>
+    </div>
+
+    <!-- Mobile Controls -->
+    <div id="mobile-controls">
+        <div class="ctrl-group">
+            <div class="ctrl-btn" id="btn-left" aria-label="Steer Left">◀</div>
+            <div class="ctrl-btn" id="btn-right" aria-label="Steer Right">▶</div>
+        </div>
+        <div class="ctrl-group">
+            <div class="ctrl-btn" id="btn-gas" style="border-color: rgba(0, 255, 102, 0.65); color: #00ff66;" aria-label="Accelerate">▲</div>
+            <div class="ctrl-btn" id="btn-brake" style="border-color: rgba(255, 68, 68, 0.65); color: #ff6666;" aria-label="Brake">▼</div>
+            <div class="ctrl-btn" id="btn-nitro" style="border-color: rgba(0, 242, 255, 0.65); color: var(--neon-blue);" aria-label="Nitro">N</div>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * SAFE LOCAL STORAGE HELPER
+ */
+const SafeStorage = {
+    getInt: (key, fallback) => {
+        try {
+            const v = localStorage.getItem(key);
+            const num = parseInt(v, 10);
+            return isNaN(num) ? fallback : num;
+        } catch (e) {
+            return fallback;
+        }
+    },
+    setInt: (key, value) => {
+        try {
+            localStorage.setItem(key, String(value));
+        } catch (e) {}
+    },
+    getString: (key, fallback) => {
+        try {
+            const v = localStorage.getItem(key);
+            return v !== null ? v : fallback;
+        } catch (e) {
+            return fallback;
+        }
+    },
+    setString: (key, value) => {
+        try {
+            localStorage.setItem(key, String(value));
+        } catch (e) {}
+    }
+};
+
+/**
+ * WEB AUDIO SYNTHESIZER: REALISTIC MULTI-CYLINDER SPORTS CAR ENGINE
+ */
+const AudioEngine = (() => {
+    let ctx = null;
+    let muted = SafeStorage.getInt('turbo_muted', 0) === 1;
+
+    // Real-time Engine Multi-Harmonic Nodes
+    let cyl1 = null;      // Primary firing pulse (sawtooth)
+    let cyl2 = null;      // Secondary cylinder firing pulse (slight acoustic detune)
+    let cylSub = null;    // Crankshaft sub-bass rumble (triangle)
+    let intakeOsc = null; // Intake valve roar
+    let engineFilter = null;
+    let engineGain = null;
+
+    // Exhaust Combustion Noise (Pink/White noise through bandpass)
+    let noiseNode = null;
+    let noiseFilter = null;
+    let noiseGain = null;
+
+    // Idle Cam Lope LFO
+    let lfoOsc = null;
+    let lfoGain = null;
+
+    // Turbo & Tire Screech Nodes
+    let turboOsc = null;
+    let turboGain = null;
+    let screechOsc = null;
+    let screechGain = null;
+
+    let isEngineRunning = false;
+
+    const init = () => { 
+        if (!ctx) {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) ctx = new AudioCtx();
+            } catch(e) {}
+        }
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+        }
+    };
+
+    const createPinkNoiseBuffer = () => {
+        if (!ctx) return null;
+        const bufferSize = ctx.sampleRate * 2;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            data[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11;
+            b6 = white * 0.115926;
+        }
+        return buffer;
+    };
+
+    const startEngine = () => {
+        if (muted || !ctx || isEngineRunning) return;
+        try {
+            init();
+            isEngineRunning = true;
+
+            // 1. Primary Cylinder Firing Pulse (Sawtooth)
+            cyl1 = ctx.createOscillator();
+            cyl1.type = 'sawtooth';
+            cyl1.frequency.setValueAtTime(45, ctx.currentTime);
+
+            // 2. Secondary Cylinder with +1.5 Hz detune for realistic acoustic beating
+            cyl2 = ctx.createOscillator();
+            cyl2.type = 'sawtooth';
+            cyl2.frequency.setValueAtTime(46.5, ctx.currentTime);
+
+            // 3. Sub-harmonic Crankshaft Exhaust Thrum (Triangle)
+            cylSub = ctx.createOscillator();
+            cylSub.type = 'triangle';
+            cylSub.frequency.setValueAtTime(22.5, ctx.currentTime);
+
+            // 4. Intake Valve High Harmonic Scream
+            intakeOsc = ctx.createOscillator();
+            intakeOsc.type = 'sawtooth';
+            intakeOsc.frequency.setValueAtTime(90, ctx.currentTime);
+
+            // Resonant Exhaust Lowpass Filter (gives deep throaty pipe resonance)
+            engineFilter = ctx.createBiquadFilter();
+            engineFilter.type = 'lowpass';
+            engineFilter.frequency.setValueAtTime(320, ctx.currentTime);
+            engineFilter.Q.setValueAtTime(3.2, ctx.currentTime);
+
+            engineGain = ctx.createGain();
+            engineGain.gain.setValueAtTime(0.08, ctx.currentTime);
+
+            // 5. Idle Cam Lope LFO (Pulsing 9Hz camshaft throb at idle)
+            lfoOsc = ctx.createOscillator();
+            lfoOsc.frequency.setValueAtTime(9.0, ctx.currentTime);
+            lfoGain = ctx.createGain();
+            lfoGain.gain.setValueAtTime(0.02, ctx.currentTime);
+            lfoOsc.connect(lfoGain.gain);
+            lfoOsc.start();
+
+            cyl1.connect(engineFilter);
+            cyl2.connect(engineFilter);
+            cylSub.connect(engineFilter);
+            intakeOsc.connect(engineFilter);
+            engineFilter.connect(engineGain);
+            engineGain.connect(ctx.destination);
+
+            cyl1.start();
+            cyl2.start();
+            cylSub.start();
+            intakeOsc.start();
+
+            // 6. Exhaust Gas Rasp Noise (simulates air-fuel flow through headers)
+            const noiseBuf = createPinkNoiseBuffer();
+            if (noiseBuf) {
+                noiseNode = ctx.createBufferSource();
+                noiseNode.buffer = noiseBuf;
+                noiseNode.loop = true;
+                noiseFilter = ctx.createBiquadFilter();
+                noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.setValueAtTime(340, ctx.currentTime);
+                noiseFilter.Q.setValueAtTime(2.8, ctx.currentTime);
+                noiseGain = ctx.createGain();
+                noiseGain.gain.setValueAtTime(0.015, ctx.currentTime);
+                noiseNode.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(ctx.destination);
+                noiseNode.start();
+            }
+
+            // 7. Turbo Boost Whoosh Oscillator
+            turboOsc = ctx.createOscillator();
+            turboOsc.type = 'sawtooth';
+            turboOsc.frequency.setValueAtTime(360, ctx.currentTime);
+            turboGain = ctx.createGain();
+            turboGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            turboOsc.connect(turboGain);
+            turboGain.connect(ctx.destination);
+            turboOsc.start();
+
+            // 8. Tire Screech Squeal Oscillator
+            screechOsc = ctx.createOscillator();
+            screechOsc.type = 'square';
+            screechOsc.frequency.setValueAtTime(860, ctx.currentTime);
+            screechGain = ctx.createGain();
+            screechGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+            screechOsc.connect(screechGain);
+            screechGain.connect(ctx.destination);
+            screechOsc.start();
+
+        } catch(e) {}
+    };
+
+    const updateEngine = (rpm, speedRatio, isBoosting, isBraking, isDrifting) => {
+        if (!isEngineRunning || muted || !ctx) return;
+        try {
+            const now = ctx.currentTime;
+            
+            // Authentic V8/Supercar firing frequency: 44Hz at 900 RPM idle up to 155Hz screaming redline
+            const f = 42 + (rpm / 8500) * 115;
+            cyl1.frequency.setTargetAtTime(f, now, 0.04);
+            cyl2.frequency.setTargetAtTime(f * 1.018, now, 0.04);
+            cylSub.frequency.setTargetAtTime(f * 0.5, now, 0.04);
+            intakeOsc.frequency.setTargetAtTime(f * 2.0, now, 0.04);
+
+            // Resonant exhaust filter opens with throttle and RPM
+            const cutoff = 260 + (rpm / 8500) * 980 + (isBoosting ? 450 : 0);
+            engineFilter.frequency.setTargetAtTime(cutoff, now, 0.04);
+
+            // Dynamic volume based on engine load
+            const baseVol = 0.07 + (rpm / 8500) * 0.11 + (isBoosting ? 0.06 : 0);
+            engineGain.gain.setTargetAtTime(Math.min(0.24, baseVol), now, 0.04);
+
+            // Idle LFO intensity fades out as RPM climbs
+            if (lfoGain) {
+                const idleStrength = Math.max(0, 0.03 - (rpm / 3500) * 0.03);
+                lfoGain.gain.setTargetAtTime(idleStrength, now, 0.05);
+            }
+
+            // Exhaust rasp noise tracks engine load & RPM
+            if (noiseFilter && noiseGain) {
+                const raspFreq = 250 + (rpm / 8500) * 1100 + (isBoosting ? 400 : 0);
+                noiseFilter.frequency.setTargetAtTime(raspFreq, now, 0.04);
+                const raspVol = 0.012 + (rpm / 8500) * 0.06 + (isBoosting ? 0.04 : 0);
+                noiseGain.gain.setTargetAtTime(Math.min(0.12, raspVol), now, 0.04);
+            }
+
+            // Turbo boost roar
+            if (isBoosting) {
+                turboGain.gain.setTargetAtTime(0.14, now, 0.06);
+                turboOsc.frequency.setTargetAtTime(480 + Math.random() * 90, now, 0.04);
+            } else {
+                turboGain.gain.setTargetAtTime(0.0001, now, 0.10);
+            }
+
+            // Tire screech squeal during high speed drift
+            if (isDrifting) {
+                screechGain.gain.setTargetAtTime(0.11, now, 0.03);
+                screechOsc.frequency.setTargetAtTime(780 + Math.random() * 240, now, 0.03);
+            } else {
+                screechGain.gain.setTargetAtTime(0.0001, now, 0.06);
+            }
+
+        } catch(e) {}
+    };
+
+    const stopEngine = () => {
+        if (!isEngineRunning) return;
+        isEngineRunning = false;
+        try {
+            if (engineGain && ctx) engineGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.04);
+            if (noiseGain && ctx) noiseGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.04);
+            if (turboGain && ctx) turboGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.04);
+            if (screechGain && ctx) screechGain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.04);
+            setTimeout(() => {
+                try {
+                    if (cyl1) { cyl1.stop(); cyl1.disconnect(); }
+                    if (cyl2) { cyl2.stop(); cyl2.disconnect(); }
+                    if (cylSub) { cylSub.stop(); cylSub.disconnect(); }
+                    if (intakeOsc) { intakeOsc.stop(); intakeOsc.disconnect(); }
+                    if (lfoOsc) { lfoOsc.stop(); lfoOsc.disconnect(); }
+                    if (noiseNode) { noiseNode.stop(); noiseNode.disconnect(); }
+                    if (turboOsc) { turboOsc.stop(); turboOsc.disconnect(); }
+                    if (screechOsc) { screechOsc.stop(); screechOsc.disconnect(); }
+                } catch(e) {}
+            }, 70);
+        } catch(e) {}
+    };
+
+    const playTone = (freq, type, duration, vol, ramp = true) => {
+        if (muted || !ctx || ctx.state === 'suspended') return;
+        try {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(vol, ctx.currentTime);
+            if (ramp) {
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+            }
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + duration);
+        } catch (e) {}
+    };
+
+    return {
+        init,
+        startEngine,
+        updateEngine,
+        stopEngine,
+        isMuted: () => muted,
+        toggleMute: () => {
+            muted = !muted;
+            SafeStorage.setInt('turbo_muted', muted ? 1 : 0);
+            if (muted) stopEngine();
+            return muted;
+        },
+        gearShift: () => {
+            // Mechanical dual exhaust crackle / DSG shift pop
+            playTone(85, 'triangle', 0.08, 0.22);
+            setTimeout(() => playTone(65, 'square', 0.09, 0.18), 35);
+            setTimeout(() => playTone(140, 'sine', 0.06, 0.12), 65);
+        },
+        turboBlowOff: () => {
+            // Pressurized turbo blow-off valve whoosh
+            playTone(620, 'sawtooth', 0.26, 0.16);
+            setTimeout(() => playTone(310, 'triangle', 0.32, 0.13), 35);
+        },
+        coin: () => {
+            playTone(988, 'sine', 0.12, 0.16);
+            setTimeout(() => playTone(1318, 'sine', 0.16, 0.18), 50);
+        },
+        boost: () => playTone(220, 'sawtooth', 0.45, 0.18),
+        crash: () => playTone(65, 'square', 0.7, 0.25),
+        click: () => playTone(460, 'sine', 0.08, 0.06),
+        countdownLow: () => playTone(480, 'triangle', 0.18, 0.22),
+        countdownGo: () => {
+            playTone(880, 'sawtooth', 0.4, 0.25);
+            setTimeout(() => playTone(1100, 'triangle', 0.5, 0.22), 60);
+        },
+        rev: () => playTone(110 + Math.random() * 40, 'sawtooth', 0.15, 0.12),
+        lvlup: () => { 
+            playTone(440, 'sine', 0.1, 0.1); 
+            setTimeout(() => playTone(880, 'sine', 0.28, 0.1), 100); 
+        },
+        victory: () => {
+            playTone(523, 'sine', 0.15, 0.15);
+            setTimeout(() => playTone(659, 'sine', 0.15, 0.15), 140);
+            setTimeout(() => playTone(784, 'sine', 0.15, 0.15), 280);
+            setTimeout(() => playTone(1047, 'sine', 0.45, 0.18), 420);
+        },
+        fail: () => {
+            playTone(320, 'sawtooth', 0.25, 0.15);
+            setTimeout(() => playTone(160, 'sawtooth', 0.45, 0.18), 240);
+        }
+    };
+})();
+
+/**
+ * INPUT CONTROLLER - INITIALIZED ONCE
+ */
+const Input = (() => {
+    const keys = {};
+    let initialized = false;
+
+    const init = () => {
+        if (initialized) return;
+        initialized = true;
+
+        const unlockAudio = () => {
+            AudioEngine.init();
+        };
+        window.addEventListener('touchstart', unlockAudio, { passive: true });
+        window.addEventListener('pointerdown', unlockAudio, { passive: true });
+        window.addEventListener('click', unlockAudio, { passive: true });
+
+        window.addEventListener('keydown', e => { 
+            keys[e.code] = true;
+            if (e.code === 'KeyP' || e.code === 'Escape') {
+                game.togglePause();
+            }
+            AudioEngine.init();
+        });
+
+        window.addEventListener('keyup', e => { 
+            keys[e.code] = false; 
+        });
+        
+        const bindButton = (id, keyCode) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+
+            const onStart = (e) => {
+                if (e.cancelable) e.preventDefault();
+                keys[keyCode] = true;
+                AudioEngine.init();
+            };
+            const onEnd = (e) => {
+                if (e.cancelable) e.preventDefault();
+                keys[keyCode] = false;
+            };
+
+            btn.addEventListener('touchstart', onStart, { passive: false });
+            btn.addEventListener('touchend', onEnd, { passive: false });
+            btn.addEventListener('touchcancel', onEnd, { passive: false });
+            btn.addEventListener('mousedown', onStart);
+            btn.addEventListener('mouseup', onEnd);
+            btn.addEventListener('mouseleave', onEnd);
+        };
+        
+        bindButton('btn-left', 'ArrowLeft');
+        bindButton('btn-right', 'ArrowRight');
+        bindButton('btn-gas', 'ArrowUp');
+        bindButton('btn-brake', 'ArrowDown');
+        bindButton('btn-nitro', 'Space');
+    };
+
+    return { init, keys };
+})();
+
+/**
+ * TURBO TRACK RACING GAME ENGINE
+ */
+const game = (() => {
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let WIDTH = window.innerWidth, HEIGHT = window.innerHeight;
+    const FIXED_STEP = 1 / 60; 
+    const ROAD_WIDTH = 3800, SEGMENT_LENGTH = 200, RUMBLE_LENGTH = 3, LANES = 4;
+    const FOV = 100, CAMERA_HEIGHT = 1000, CAMERA_DEPTH = 1 / Math.tan((FOV / 2) * Math.PI / 180);
+    const DRAW_DISTANCE = 300;
+    const MAX_SPEED_BASE = 22000;
+    let MAX_SPEED = MAX_SPEED_BASE, ACCEL = MAX_SPEED / 4.5;
+    const BREAKING = -MAX_SPEED * 1.6, OFF_ROAD_DECEL = -MAX_SPEED / 2, OFF_ROAD_LIMIT = MAX_SPEED / 4;
+
+    let state = 'MENU';
+    let segments = [], cars = [], trackLength = 0;
+    let highscore = SafeStorage.getInt('turbo_highscore', 0);
+    let unlockedLevel = SafeStorage.getInt('turbo_unlocked', 1);
+    let totalCoins = SafeStorage.getInt('turbo_totalcoins', 0);
+    let currentLevel = 1;
+    let currentLevelConfig = null;
+    let crashCooldown = 0;
+    let countdownTimer = 0;
+    let countdownStep = -1;
+    let selectedCarColor = SafeStorage.getString('turbo_car_color', '#00f2ff');
+    let selectedWorldView = 0;
+
+    let player = { 
+        x: 0, z: 0, speed: 0, fuel: 100, coins: 0, nitro: 100, 
+        isBoosting: false, isAccelerating: false, isBraking: false,
+        distanceMeters: 0, level: 1, crashes: 0, bonusScore: 0,
+        raceDistance: 0, lap: 0, steerAngle: 0
+    };
+
+    let skyOffset = 0, lastFrameTime = 0, fps = 0, globalTime = 0, levelUpAnim = 0;
+    let currentRacePosition = 1;
+    let floatingPickups = [];
+
+    let levelColors = { 
+        road: '#333', road2: '#2a2a2a', grass: '#050', grass2: '#040', 
+        rumble: '#777', rumble2: '#333', lane: '#ccc', lane2: '#2a2a2a' 
+    };
+    let levelEnv = { sky1: '#1a82b8', sky2: '#020b1a', mountain: '#050505', name: 'NEON CITY' };
+
+    // 20 Unique Environments / Biomes
+    const ENVIRONMENTS = [
+        { name: 'NEON CITY',   sky1: '#1a82b8', sky2: '#020b1a', mountain: '#050505', road: '#333', road2: '#2a2a2a', grass: '#050', grass2: '#040', rumble: '#777', rumble2: '#333', lane: '#ccc', lane2: '#2a2a2a' },
+        { name: 'DESERT RUN',  sky1: '#ff8c00', sky2: '#ff4500', mountain: '#8B4513', road: '#4a3a2a', road2: '#3a2a1a', grass: '#8B7355', grass2: '#7B6345', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#4a3a2a' },
+        { name: 'FOREST PASS', sky1: '#228B22', sky2: '#0a3a0a', mountain: '#1a3a1a', road: '#333', road2: '#2a2a2a', grass: '#0a0', grass2: '#080', rumble: '#5a5', rumble2: '#3a3', lane: '#ddd', lane2: '#2a2a2a' },
+        { name: 'SNOW PEAK',   sky1: '#B0C4DE', sky2: '#4682B4', mountain: '#fff',    road: '#444', road2: '#3a3a3a', grass: '#ddd', grass2: '#ccc', rumble: '#00f', rumble2: '#00a', lane: '#fff', lane2: '#3a3a3a' },
+        { name: 'NIGHT RUSH',  sky1: '#0a0a2a', sky2: '#000000', mountain: '#000',    road: '#222', road2: '#1a1a1a', grass: '#001', grass2: '#000', rumble: '#f0f', rumble2: '#a0a', lane: '#0ff', lane2: '#1a1a1a' },
+        { name: 'SUNSET BLVD', sky1: '#FF1493', sky2: '#4B0082', mountain: '#2a0a2a', road: '#333', road2: '#2a2a2a', grass: '#300030', grass2: '#200020', rumble: '#ff0', rumble2: '#aa0', lane: '#fff', lane2: '#2a2a2a' },
+        { name: 'MOUNTAIN RD', sky1: '#708090', sky2: '#2F4F4F', mountain: '#2F4F4F', road: '#333', road2: '#2a2a2a', grass: '#355', grass2: '#244', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#2a2a2a' },
+        { name: 'OCEAN DRIVE', sky1: '#00CED1', sky2: '#191970', mountain: '#003366', road: '#333', road2: '#2a2a2a', grass: '#055', grass2: '#044', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#2a2a2a' },
+        { name: 'LAVA FIELDS', sky1: '#8B0000', sky2: '#1a0000', mountain: '#300',    road: '#222', road2: '#1a1a1a', grass: '#300', grass2: '#200', rumble: '#f00', rumble2: '#a00', lane: '#ff0', lane2: '#1a1a1a' },
+        { name: 'ARCTIC ZONE', sky1: '#E0FFFF', sky2: '#008B8B', mountain: '#AFEEEE', road: '#555', road2: '#4a4a4a', grass: '#AFEEEE', grass2: '#9FDEDE', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#4a4a4a' },
+        { name: 'CYBER ZONE',  sky1: '#4B0082', sky2: '#000000', mountain: '#100020', road: '#111', road2: '#0a0a0a', grass: '#100020', grass2: '#080010', rumble: '#0ff', rumble2: '#0aa', lane: '#f0f', lane2: '#0a0a0a' },
+        { name: 'GOLDEN HILLS',sky1: '#FFD700', sky2: '#8B4513', mountain: '#8B4513', road: '#333', road2: '#2a2a2a', grass: '#8B7355', grass2: '#7B6345', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#2a2a2a' },
+        { name: 'TOXIC WASTE', sky1: '#7CFC00', sky2: '#2a3a00', mountain: '#1a2a00', road: '#222', road2: '#1a1a1a', grass: '#2a2a00', grass2: '#1a1a00', rumble: '#0f0', rumble2: '#0a0', lane: '#fff', lane2: '#1a1a1a' },
+        { name: 'BLOOD MOON',  sky1: '#8B0000', sky2: '#1a0000', mountain: '#1a0000', road: '#111', road2: '#0a0a0a', grass: '#200', grass2: '#100', rumble: '#f00', rumble2: '#a00', lane: '#800', lane2: '#0a0a0a' },
+        { name: 'CRYSTAL CAVE',sky1: '#9370DB', sky2: '#1a0a2a', mountain: '#1a0a2a', road: '#222', road2: '#1a1a1a', grass: '#1a0a2a', grass2: '#100520', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#1a1a1a' },
+        { name: 'SAVANNA',     sky1: '#DEB887', sky2: '#8B4513', mountain: '#8B4513', road: '#333', road2: '#2a2a2a', grass: '#8B7355', grass2: '#7B6345', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#2a2a2a' },
+        { name: 'STORM ROAD',  sky1: '#2F4F4F', sky2: '#000000', mountain: '#000',    road: '#222', road2: '#1a1a1a', grass: '#111', grass2: '#0a0a0a', rumble: '#ff0', rumble2: '#aa0', lane: '#fff', lane2: '#1a1a1a' },
+        { name: 'CHERRY BLM',  sky1: '#FFB6C1', sky2: '#C71585', mountain: '#C71585', road: '#333', road2: '#2a2a2a', grass: '#030', grass2: '#020', rumble: '#fff', rumble2: '#ddd', lane: '#fff', lane2: '#2a2a2a' },
+        { name: 'AURORA',      sky1: '#00FF7F', sky2: '#000080', mountain: '#000040', road: '#111', road2: '#0a0a0a', grass: '#001020', grass2: '#000810', rumble: '#f0f', rumble2: '#a0a', lane: '#0ff', lane2: '#0a0a0a' },
+        { name: 'INFERNO',     sky1: '#FF4500', sky2: '#1a0000', mountain: '#200',    road: '#111', road2: '#0a0a0a', grass: '#200', grass2: '#100', rumble: '#ff0', rumble2: '#aa0', lane: '#f00', lane2: '#0a0a0a' },
+    ];
+
+    // 12 GRAND PRIX WORLDS ACROSS 120 STAGES (100+ LEVELS)
+    const WORLDS = [
+        { id: 0,  name: 'NEON METROPOLIS', envIdx: 0,  desc: 'Cyberpunk Skyline' },
+        { id: 1,  name: 'MOJAVE OUTRUN',   envIdx: 1,  desc: 'Sun-drenched Dunes' },
+        { id: 2,  name: 'ALPINE BLIZZARD', envIdx: 3,  desc: 'Snowy Peak Pass' },
+        { id: 3,  name: 'EMERALD CANOPY',  envIdx: 2,  desc: 'Dense Pine Forest' },
+        { id: 4,  name: 'SUNSET STRIP',    envIdx: 5,  desc: 'Pacific Coastal Highway' },
+        { id: 5,  name: 'CYBER DRAGWAY',   envIdx: 10, desc: 'Neon Grid Highway' },
+        { id: 6,  name: 'VOLCANIC RIDGE',  envIdx: 8,  desc: 'Magma Canyons' },
+        { id: 7,  name: 'OCEAN HIGHWAY',   envIdx: 7,  desc: 'Coastal Bridge Run' },
+        { id: 8,  name: 'SAHARA MIRAGE',   envIdx: 11, desc: 'Golden Desert' },
+        { id: 9,  name: 'TOKYO EXPRESS',   envIdx: 4,  desc: 'Midnight Drift Circuit' },
+        { id: 10, name: 'AURORA HORIZON',  envIdx: 18, desc: 'Glacial Lights' },
+        { id: 11, name: 'INFERNO APEX',    envIdx: 19, desc: 'Grand Prix Finale' }
+    ];
+
+    const getLevelConfig = (lvl) => {
+        const safeLvl = Math.max(1, Math.min(120, lvl));
+        const worldIdx = Math.floor((safeLvl - 1) / 10) % WORLDS.length;
+        const stageInWorld = ((safeLvl - 1) % 10) + 1;
+        const world = WORLDS[worldIdx];
+        const env = ENVIRONMENTS[world.envIdx % ENVIRONMENTS.length];
+        
+        // Long, thrilling Grand Prix highway run as requested: Level 1 = 3000m, scaling by 100m per stage
+        const targetDist = Math.round(3000 + (safeLvl - 1) * 100);
+        // Target coins for 3-star rating
+        const targetCoins = Math.min(35, 12 + Math.floor((safeLvl - 1) * 0.25));
+        const maxCrashes = 99;
+        // Traffic density: 18 to 50 cars
+        const traffic = Math.min(50, 18 + Math.floor(safeLvl * 0.28));
+        // Curve intensity: from 3.8 to 7.5
+        const curveIntensity = Math.min(7.5, 3.8 + (safeLvl * 0.025));
+        // Speed multiplier
+        const speedMultiplier = Math.min(1.45, 1.15 + (safeLvl - 1) * 0.003);
+        const aiSpeedMultiplier = Math.min(1.30, 0.95 + (safeLvl * 0.003));
+
+        return {
+            level: safeLvl,
+            worldIdx: worldIdx,
+            worldName: world.name,
+            stageInWorld: stageInWorld,
+            name: `${world.name} · STAGE ${safeLvl}`,
+            env: env,
+            targetDist: targetDist,
+            targetCoins: targetCoins,
+            maxCrashes: maxCrashes,
+            traffic: traffic,
+            curveIntensity: curveIntensity,
+            speedMultiplier: speedMultiplier,
+            aiSpeedMultiplier: aiSpeedMultiplier,
+            mountainCount: Math.min(14, 6 + (worldIdx % 6))
+        };
+    };
+
+    const saveProgress = () => {
+        SafeStorage.setInt('turbo_unlocked', unlockedLevel);
+        SafeStorage.setInt('turbo_highscore', highscore);
+        SafeStorage.setInt('turbo_totalcoins', totalCoins);
+    };
+
+    const project = (p, cameraX, cameraY, cameraZ, width, height) => {
+        p.camera.x = (p.world.x || 0) - cameraX;
+        p.camera.y = (p.world.y || 0) - cameraY;
+        p.camera.z = (p.world.z || 0) - cameraZ;
+        p.screen.scale = CAMERA_DEPTH / Math.max(1, p.camera.z);
+        p.screen.x = Math.round((width / 2) + (p.screen.scale * p.camera.x * width / 2));
+        p.screen.y = Math.round((height / 2) - (p.screen.scale * p.camera.y * height / 2));
+        p.screen.w = Math.round((p.screen.scale * ROAD_WIDTH * width / 2));
+    };
+
+    const addSegment = (curve, y) => {
+        const n = segments.length;
+        const lastY = n > 0 ? segments[n - 1].p2.world.y : 0;
+        segments.push({
+            index: n,
+            p1: { world: { y: lastY, z: n * SEGMENT_LENGTH }, camera: {}, screen: {} },
+            p2: { world: { y: y, z: (n + 1) * SEGMENT_LENGTH }, camera: {}, screen: {} },
+            curve: curve || 0, 
+            sprites: [],
+            color: Math.floor(n / RUMBLE_LENGTH) % 2 ? 
+                { road: levelColors.road, grass: levelColors.grass, rumble: levelColors.rumble, lane: levelColors.lane } : 
+                { road: levelColors.road2, grass: levelColors.grass2, rumble: levelColors.rumble2, lane: levelColors.lane2 }
+        });
+    };
+
+    // GUARANTEED SAFE FALLBACK SEGMENT (PREVENTS ANY UNDEFINED CURVE ERRORS)
+    const SAFE_EMPTY_SEGMENT = {
+        index: 0,
+        curve: 0,
+        p1: { world: { x: 0, y: 0, z: 0 }, screen: { x: 0, y: 0, w: 0, scale: 0 }, camera: { x: 0, y: 0, z: 0 } },
+        p2: { world: { x: 0, y: 0, z: 0 }, screen: { x: 0, y: 0, w: 0, scale: 0 }, camera: { x: 0, y: 0, z: 0 } },
+        color: { road: '#333', grass: '#050', rumble: '#777', lane: '#ccc' },
+        sprites: []
+    };
+
+    const findSegment = (z) => {
+        if (!segments || segments.length === 0) return SAFE_EMPTY_SEGMENT;
+        let idx = Math.floor(z / SEGMENT_LENGTH) % segments.length;
+        if (idx < 0) idx = (idx % segments.length) + segments.length;
+        return segments[idx] || segments[0] || SAFE_EMPTY_SEGMENT;
+    };
+
+    const buildTrack = () => {
+        segments = [];
+        let curCurve = 0, curHill = 0;
+        const curveInt = currentLevelConfig ? currentLevelConfig.curveIntensity : 5;
+        const targetTrackSegments = 1200 + Math.min(800, currentLevel * 15);
+
+        while (segments.length < targetTrackSegments) {
+            let len = 35 + Math.floor(Math.random() * 65);
+            curCurve = (Math.random() * curveInt * 2) - curveInt;
+            for (let n = 0; n < len; n++) {
+                addSegment(curCurve, 0); // Flat, 100% stable highway without up-and-down pitching
+            }
+        }
+        trackLength = segments.length * SEGMENT_LENGTH;
+
+        // Populate scenery & collectibles
+        let coinTrailCountdown = 0;
+        let coinTrailLane = 0;
+
+        segments.forEach((seg, i) => {
+            // Dense Roadside Scenery: Trees and City Buildings along both verges
+            if (i % 2 === 0) {
+                const side = (i % 4 === 0) ? 1.9 : -1.9;
+                const r = Math.random();
+                const isCityWorld = (currentLevelConfig && (currentLevelConfig.worldIdx === 0 || currentLevelConfig.worldIdx === 4 || currentLevelConfig.worldIdx === 5 || currentLevelConfig.worldIdx === 7));
+                
+                if (isCityWorld ? (r > 0.35) : (r > 0.50)) {
+                    if (r > 0.72) {
+                        seg.sprites.push({ x: side * (1.1 + Math.random() * 0.3), type: 'building', scale: 2.2 + Math.random() * 0.7 });
+                    } else if (r > 0.48) {
+                        seg.sprites.push({ x: side * (1.1 + Math.random() * 0.25), type: 'tower', scale: 2.4 + Math.random() * 0.6 });
+                    } else if (r > 0.32) {
+                        seg.sprites.push({ x: side, type: 'billboard', scale: 1.8 });
+                    } else {
+                        seg.sprites.push({ x: side, type: 'light', scale: 1.9 });
+                    }
+                } else {
+                    const treeType = (currentLevelConfig && currentLevelConfig.worldIdx === 7) ? 'palm' : 'tree';
+                    seg.sprites.push({ x: side, type: treeType, scale: 1.6 + Math.random() * 0.5 });
+                }
+
+                // Add opposite side tree or building for rich bilateral scenery density
+                if (Math.random() > 0.30) {
+                    const oppType = Math.random() > 0.45 ? 'tree' : 'building';
+                    seg.sprites.push({ x: -side * (1.15 + Math.random() * 0.3), type: oppType, scale: 1.8 + Math.random() * 0.6 });
+                }
+            }
+
+            // Frequent glowing Nitro pickups along racing lanes for high-speed turbo blasts (No coins as requested)
+            if (i > 15 && i % 22 === 0) {
+                const laneOptions = [-0.55, -0.28, 0.0, 0.28, 0.55];
+                const lane = laneOptions[Math.floor(Math.random() * laneOptions.length)];
+                seg.sprites.push({ x: lane, type: 'nitro_box' });
+            }
+
+            // Fuel pickups every 40 segments
+            if (i > 20 && i % 40 === 20) {
+                seg.sprites.push({ x: (Math.random() * 0.8 - 0.4), type: 'fuel' });
+            }
+        });
+    };
+
+    const drawPolygon = (x1, y1, x2, y2, x3, y3, x4, y4, color) => {
+        ctx.fillStyle = color; 
+        ctx.beginPath();
+        ctx.moveTo(x1, y1); 
+        ctx.lineTo(x2, y2); 
+        ctx.lineTo(x3, y3); 
+        ctx.lineTo(x4, y4);
+        ctx.closePath(); 
+        ctx.fill();
+    };
+
+    const drawSegment = (segment) => {
+        const p1 = segment.p1.screen, p2 = segment.p2.screen;
+        if (p1.y <= p2.y) return; 
+
+        // Grass
+        ctx.fillStyle = segment.color.grass;
+        ctx.fillRect(0, p2.y, WIDTH, p1.y - p2.y);
+
+        // Shoulder
+        const s1 = p1.w * 1.18, s2 = p2.w * 1.18;
+        drawPolygon(p1.x - s1, p1.y, p1.x + s1, p1.y, p2.x + s2, p2.y, p2.x - s2, p2.y, '#2c2c2c');
+
+        // Road
+        drawPolygon(p1.x - p1.w, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y, p2.x - p2.w, p2.y, segment.color.road);
+
+        // Rumble Strips
+        const r1 = p1.w * 0.1, r2 = p2.w * 0.1;
+        drawPolygon(p1.x - p1.w - r1, p1.y, p1.x - p1.w, p1.y, p2.x - p2.w, p2.y, p2.x - p2.w - r2, p2.y, segment.color.rumble);
+        drawPolygon(p1.x + p1.w + r1, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y, p2.x + p2.w + r2, p2.y, segment.color.rumble);
+
+        // Lane markings
+        if (segment.color.lane !== segment.color.road) {
+            const lw1 = p1.w * 0.035, lw2 = p2.w * 0.035;
+            for (let i = 1; i < LANES; i++) {
+                let lx1 = p1.x - p1.w + (p1.w * 2 * i / LANES);
+                let lx2 = p2.x - p2.w + (p2.w * 2 * i / LANES);
+                drawPolygon(lx1 - lw1, p1.y, lx1 + lw1, p1.y, lx2 + lw2, p2.y, lx2 - lw2, p2.y, segment.color.lane);
+            }
+        }
+
+        // Authentic Formula / Grand Prix Checkered Starting Line Grid
+        if (segment.index === 0 || segment.index === 1) {
+            const checks = 12;
+            for (let c = 0; c < checks; c++) {
+                const isWhite = (c + segment.index) % 2 === 0;
+                const cx1 = p1.x - p1.w + (p1.w * 2 * c / checks);
+                const cx2 = p1.x - p1.w + (p1.w * 2 * (c + 1) / checks);
+                const cy1 = p2.x - p2.w + (p2.w * 2 * c / checks);
+                const cy2 = p2.x - p2.w + (p2.w * 2 * (c + 1) / checks);
+                drawPolygon(cx1, p1.y, cx2, p1.y, cy2, p2.y, cy1, p2.y, isWhite ? '#ffffff' : '#141414');
+            }
+        }
+    };
+
+    const drawSprite = (s, seg) => {
+        const scale = seg.p1.screen.scale;
+        if (!scale || scale <= 0 || (seg.p1.camera && seg.p1.camera.z <= CAMERA_DEPTH)) return;
+        const destX = seg.p1.screen.x + (scale * s.x * ROAD_WIDTH * WIDTH / 2);
+        const destY = seg.p1.screen.y;
+        const size = (s.type === 'tree' || s.type === 'palm' || s.type === 'building' || s.type === 'tower' ? 520 : 260) * (s.scale || 1.0) * scale * (WIDTH / 2);
+
+        if (s.type === 'coin') {
+            const rot = Math.abs(Math.sin(globalTime * 0.12));
+            const coinW = Math.max(3, (size * 0.42) * rot);
+            const coinH = size * 0.42;
+
+            // Outer golden glow & drop shadow
+            ctx.save();
+            ctx.shadowColor = '#ffd700';
+            ctx.shadowBlur = 8;
+            ctx.fillStyle = '#ffd700'; 
+            ctx.beginPath(); 
+            ctx.ellipse(destX, destY - coinH, coinW, coinH, 0, 0, Math.PI * 2); 
+            ctx.fill();
+            ctx.restore();
+
+            // Inner shiny rim
+            ctx.strokeStyle = '#fff899';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.ellipse(destX, destY - coinH, coinW * 0.72, coinH * 0.72, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Embossed Dollar symbol
+            if (rot > 0.35) {
+                ctx.fillStyle = '#b38600';
+                ctx.font = `bold ${Math.max(6, Math.round(coinH * 0.65))}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('$', destX, destY - coinH);
+            }
+        } else if (s.type === 'fuel') {
+            ctx.fillStyle = '#ff3333';
+            ctx.fillRect(destX - size / 2, destY - size, size, size);
+            ctx.fillStyle = '#fff';
+            ctx.font = `bold ${Math.max(8, Math.round(size * 0.4))}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('F', destX, destY - size * 0.28);
+        } else if (s.type === 'nitro_box') {
+            ctx.fillStyle = '#00f2ff';
+            ctx.fillRect(destX - size / 2, destY - size, size, size);
+            ctx.fillStyle = '#000';
+            ctx.font = `bold ${Math.max(8, Math.round(size * 0.4))}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText('N', destX, destY - size * 0.28);
+        } else if (s.type === 'tree') {
+            const th = size * 1.5;
+            const tw = size * 0.85;
+            // Shaded trunk
+            ctx.fillStyle = '#3e2723';
+            ctx.fillRect(destX - tw * 0.08, destY - th * 0.22, tw * 0.16, th * 0.22);
+            
+            // 3-Tier Pine Foliage with highlights
+            const tiers = [
+                { y: destY - th * 0.15, w: tw * 0.9, h: th * 0.32, col: '#1b5e20' },
+                { y: destY - th * 0.38, w: tw * 0.72, h: th * 0.30, col: '#2e7d32' },
+                { y: destY - th * 0.60, w: tw * 0.52, h: th * 0.35, col: '#388e3c' }
+            ];
+            tiers.forEach(t => {
+                ctx.fillStyle = t.col;
+                ctx.beginPath();
+                ctx.moveTo(destX, t.y - t.h);
+                ctx.lineTo(destX - t.w * 0.5, t.y);
+                ctx.lineTo(destX + t.w * 0.5, t.y);
+                ctx.closePath();
+                ctx.fill();
+                // Sunlight highlight
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.beginPath();
+                ctx.moveTo(destX, t.y - t.h);
+                ctx.lineTo(destX - t.w * 0.5, t.y);
+                ctx.lineTo(destX, t.y);
+                ctx.closePath();
+                ctx.fill();
+            });
+        } else if (s.type === 'palm') {
+            const ph = size * 1.5;
+            const pw = size * 0.9;
+            ctx.strokeStyle = '#5d4037';
+            ctx.lineWidth = Math.max(3, pw * 0.12);
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(destX, destY);
+            ctx.quadraticCurveTo(destX + pw * 0.25, destY - ph * 0.5, destX + pw * 0.12, destY - ph * 0.85);
+            ctx.stroke();
+
+            const topX = destX + pw * 0.12;
+            const topY = destY - ph * 0.85;
+            ctx.strokeStyle = '#2e7d32';
+            ctx.lineWidth = Math.max(2, pw * 0.07);
+            const fronds = [-0.45, -0.2, 0.12, 0.38, -0.65, 0.6];
+            fronds.forEach(a => {
+                ctx.beginPath();
+                ctx.moveTo(topX, topY);
+                ctx.quadraticCurveTo(topX + a * pw, topY - ph * 0.08, topX + a * pw * 1.25, topY + ph * 0.15);
+                ctx.stroke();
+            });
+        } else if (s.type === 'building') {
+            const bh = size * 2.2;
+            const bw = size * 1.1;
+            const bx = destX - bw * 0.5;
+            const by = destY - bh;
+
+            // Main skyscraper concrete body
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(bx, by, bw, bh);
+
+            // Left side depth
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(bx, by, bw * 0.82, bh);
+
+            // Neon roof trim
+            ctx.fillStyle = '#00f2ff';
+            ctx.fillRect(bx, by, bw, Math.max(2, bh * 0.025));
+
+            // Rooftop antenna & blinking red aviation beacon
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(destX, by);
+            ctx.lineTo(destX, by - bh * 0.12);
+            ctx.stroke();
+            ctx.fillStyle = Math.sin(globalTime * 0.15) > 0 ? '#ff0033' : '#440000';
+            ctx.beginPath();
+            ctx.arc(destX, by - bh * 0.12, Math.max(2, bw * 0.035), 0, Math.PI * 2);
+            ctx.fill();
+
+            // Illuminated window grid
+            const rows = 6;
+            const cols = 4;
+            const winW = bw * 0.12;
+            const winH = bh * 0.06;
+            const gapX = bw * 0.08;
+            const gapY = bh * 0.07;
+            const startX = bx + bw * 0.1;
+            const startY = by + bh * 0.14;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const wx = startX + c * (winW + gapX);
+                    const wy = startY + r * (winH + gapY);
+                    const isLit = ((r * 3 + c * 7 + (seg.index || 0)) % 5) !== 0;
+                    ctx.fillStyle = isLit ? (r % 2 === 0 ? '#ffd700' : '#00f2ff') : '#1e293b';
+                    ctx.fillRect(wx, wy, winW, winH);
+                }
+            }
+        } else if (s.type === 'tower') {
+            const bh = size * 2.8;
+            const bw = size * 0.9;
+            const bx = destX - bw * 0.5;
+            const by = destY - bh;
+
+            // Sleek glass skyscraper
+            ctx.fillStyle = '#0c1b33';
+            ctx.fillRect(bx, by, bw, bh);
+
+            // Angled spire roof
+            ctx.fillStyle = '#00f2ff';
+            ctx.beginPath();
+            ctx.moveTo(bx, by);
+            ctx.lineTo(destX, by - bh * 0.16);
+            ctx.lineTo(bx + bw, by);
+            ctx.closePath();
+            ctx.fill();
+
+            // Diagonal structural glass trusses
+            ctx.strokeStyle = 'rgba(0, 242, 255, 0.35)';
+            ctx.lineWidth = 1;
+            for (let y = by; y < destY - 10; y += bh * 0.16) {
+                ctx.beginPath();
+                ctx.moveTo(bx, y);
+                ctx.lineTo(bx + bw, y + bh * 0.16);
+                ctx.moveTo(bx + bw, y);
+                ctx.lineTo(bx, y + bh * 0.16);
+                ctx.stroke();
+            }
+        } else if (s.type === 'billboard') {
+            const bw = size * 1.5;
+            const bh = size * 0.72;
+            const postH = size * 0.8;
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(destX - bw * 0.25 - 2, destY - postH, 4, postH);
+            ctx.fillRect(destX + bw * 0.25 - 2, destY - postH, 4, postH);
+            
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(destX - bw * 0.5, destY - postH - bh, bw, bh);
+            ctx.strokeStyle = '#00f2ff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(destX - bw * 0.5, destY - postH - bh, bw, bh);
+            
+            ctx.fillStyle = '#ffd700';
+            ctx.font = `bold ${Math.max(8, Math.round(bh * 0.34))}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText('TURBO RACING', destX, destY - postH - bh * 0.46);
+            ctx.fillStyle = '#00f2ff';
+            ctx.font = `bold ${Math.max(6, Math.round(bh * 0.20))}px monospace`;
+            ctx.fillText('★ NITRO SPEED ★', destX, destY - postH - bh * 0.18);
+        } else if (s.type === 'light') {
+            const lh = size * 1.4;
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = Math.max(2, size * 0.05);
+            ctx.beginPath();
+            ctx.moveTo(destX, destY);
+            ctx.lineTo(destX, destY - lh);
+            ctx.lineTo(destX + (s.x > 0 ? -size * 0.35 : size * 0.35), destY - lh);
+            ctx.stroke();
+            
+            const lampX = destX + (s.x > 0 ? -size * 0.35 : size * 0.35);
+            ctx.fillStyle = '#fff570';
+            ctx.beginPath();
+            ctx.arc(lampX, destY - lh, Math.max(3, size * 0.08), 0, Math.PI * 2);
+            ctx.fill();
+        }
+    };
+
+    // ==========================================
+    // REALISTIC CAR GRAPHICS (CANVAS PROCEDURAL)
+    // ==========================================
+    const drawRealisticPlayerCar = (customX, customY, customScale) => {
+        const isCustom = customX !== undefined;
+        const x = isCustom ? customX : (WIDTH / 2);
+        const isMobileScreen = window.matchMedia('(hover: none) and (pointer: coarse), (max-width: 860px)').matches;
+        // Position car safely above mobile controls and dashboard so it is 100% visible and never covered
+        const baseY = isMobileScreen ? (HEIGHT - 195) : (HEIGHT - 90);
+        const y = isCustom ? customY : baseY;
+        const sc = customScale || (isMobileScreen ? 0.82 : 1.0);
+        const w = 210 * sc, h = 88 * sc;
+        const roll = isCustom ? 0 : ((player.steerAngle || 0) * 4);
+        const carThemeColor = selectedCarColor || '#00f2ff';
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(roll * Math.PI / 180);
+
+        // Post-crash invulnerability flashing (semi-transparent grace period)
+        if (!isCustom && crashCooldown > 0 && Math.floor(crashCooldown * 8) % 2 === 0) {
+            ctx.globalAlpha = 0.55;
+        }
+
+        // Ground Contact Ambient Occlusion Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.beginPath();
+        ctx.ellipse(0, 14, w * 0.52, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rear Tires (Wide high-performance tires)
+        const tireW = w * 0.17, tireH = h * 0.42;
+        const tireLeftX = -w * 0.48, tireRightX = w * 0.31;
+        const tireY = -tireH * 0.4;
+        
+        ctx.fillStyle = '#111';
+        // Left tire
+        ctx.beginPath();
+        ctx.roundRect(tireLeftX, tireY, tireW, tireH, [6, 2, 6, 6]);
+        ctx.fill();
+        // Right tire
+        ctx.beginPath();
+        ctx.roundRect(tireRightX, tireY, tireW, tireH, [2, 6, 6, 6]);
+        ctx.fill();
+
+        // Tire Treads & Rim Rim Highlights
+        ctx.strokeStyle = '#282828';
+        ctx.lineWidth = 1.5;
+        for (let i = 1; i <= 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(tireLeftX + (tireW / 4) * i, tireY + 4);
+            ctx.lineTo(tireLeftX + (tireW / 4) * i, tireY + tireH - 4);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(tireRightX + (tireW / 4) * i, tireY + 4);
+            ctx.lineTo(tireRightX + (tireW / 4) * i, tireY + tireH - 4);
+            ctx.stroke();
+        }
+        // Inner Alloy Wheel Edge
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tireLeftX + 3, tireY + 4, 3, tireH - 8);
+        ctx.strokeRect(tireRightX + tireW - 6, tireY + 4, 3, tireH - 8);
+
+        // Rear Diffuser (Lower Aero Carbon Fiber)
+        const diffW = w * 0.62, diffH = h * 0.22;
+        const diffX = -diffW / 2, diffY = -diffH * 0.8;
+        ctx.fillStyle = '#0a0a0c';
+        ctx.fillRect(diffX, diffY, diffW, diffH);
+
+        // Vertical Diffuser Fins
+        ctx.fillStyle = '#1f1f24';
+        for (let i = 1; i < 5; i++) {
+            const finX = diffX + (diffW / 5) * i;
+            ctx.fillRect(finX - 1.5, diffY - 1, 3, diffH + 2);
+        }
+
+        // Dual Polished Titanium Exhaust Tips
+        const exY = diffY + diffH * 0.35;
+        const exW = 14, exH = 10;
+        const exLeftX = diffX + diffW * 0.18;
+        const exRightX = diffX + diffW * 0.82 - exW;
+
+        // Exhaust pipes
+        ctx.fillStyle = '#1a202c';
+        ctx.strokeStyle = '#4a5568';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(exLeftX + exW/2, exY + exH/2, exW/2, exH/2, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(exRightX + exW/2, exY + exH/2, exW/2, exH/2, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+
+        // Nitro Exhaust Flame
+        if (player.isBoosting) {
+            const flameLen = 65 + Math.random() * 35;
+            const flicker = Math.random() * 6 - 3;
+            // Left flame
+            const gradL = ctx.createLinearGradient(0, exY, 0, exY + flameLen);
+            gradL.addColorStop(0, '#ffffff');
+            gradL.addColorStop(0.2, '#00f2ff');
+            gradL.addColorStop(0.65, '#0066ff');
+            gradL.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradL;
+            ctx.beginPath();
+            ctx.moveTo(exLeftX, exY + exH/2);
+            ctx.lineTo(exLeftX + exW/2 + flicker, exY + flameLen);
+            ctx.lineTo(exLeftX + exW, exY + exH/2);
+            ctx.fill();
+
+            // Right flame
+            const gradR = ctx.createLinearGradient(0, exY, 0, exY + flameLen);
+            gradR.addColorStop(0, '#ffffff');
+            gradR.addColorStop(0.2, '#00f2ff');
+            gradR.addColorStop(0.65, '#0066ff');
+            gradR.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradR;
+            ctx.beginPath();
+            ctx.moveTo(exRightX, exY + exH/2);
+            ctx.lineTo(exRightX + exW/2 - flicker, exY + flameLen);
+            ctx.lineTo(exRightX + exW, exY + exH/2);
+            ctx.fill();
+        }
+
+        // Sculpted Rear Bumper & Wide Body Fenders
+        const bW = w * 0.94, bH = h * 0.52;
+        const bX = -bW / 2, bY = -bH - diffH * 0.3;
+
+        const bodyGrad = ctx.createLinearGradient(bX, bY, bX + bW, bY + bH);
+        bodyGrad.addColorStop(0, '#0d131f');
+        bodyGrad.addColorStop(0.25, '#1e293b');
+        bodyGrad.addColorStop(0.5, '#0f172a');
+        bodyGrad.addColorStop(0.75, '#1e293b');
+        bodyGrad.addColorStop(1, '#0d131f');
+
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(bX + 16, bY + bH);
+        ctx.lineTo(bX, bY + bH * 0.35);
+        ctx.lineTo(bX + 18, bY);
+        ctx.lineTo(-bX - 18, bY);
+        ctx.lineTo(-bX, bY + bH * 0.35);
+        ctx.lineTo(-bX - 16, bY + bH);
+        ctx.closePath();
+        ctx.fill();
+
+        // Aerodynamic Bumper Vents
+        ctx.fillStyle = '#05070a';
+        ctx.fillRect(bX + 12, bY + bH * 0.25, 20, bH * 0.45);
+        ctx.fillRect(-bX - 32, bY + bH * 0.25, 20, bH * 0.45);
+
+        // License Plate Recess
+        ctx.fillStyle = '#050508';
+        ctx.fillRect(-28, bY + bH * 0.38, 56, 16);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('TURBO', 0, bY + bH * 0.38 + 12);
+
+        // Sloping Cabin Glass / Rear Windshield
+        const cabW = w * 0.62, cabTopW = w * 0.44, cabH = h * 0.44;
+        const cabBottomY = bY + 2, cabTopY = cabBottomY - cabH;
+
+        const glassGrad = ctx.createLinearGradient(-cabW/2, cabTopY, cabW/2, cabBottomY);
+        glassGrad.addColorStop(0, '#0a1018');
+        glassGrad.addColorStop(0.4, '#1b2d42');
+        glassGrad.addColorStop(0.65, '#2a4365');
+        glassGrad.addColorStop(1, '#080d14');
+
+        ctx.fillStyle = glassGrad;
+        ctx.beginPath();
+        ctx.moveTo(-cabW / 2, cabBottomY);
+        ctx.lineTo(-cabTopW / 2, cabTopY);
+        ctx.lineTo(cabTopW / 2, cabTopY);
+        ctx.lineTo(cabW / 2, cabBottomY);
+        ctx.closePath();
+        ctx.fill();
+
+        // Rear Glass Defroster Grid
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.lineWidth = 1;
+        for (let i = 1; i <= 3; i++) {
+            const lineY = cabTopY + (cabH / 4) * i;
+            const inset = (cabW - cabTopW) * (1 - i / 4) * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(-cabW / 2 + inset + 4, lineY);
+            ctx.lineTo(cabW / 2 - inset - 4, lineY);
+            ctx.stroke();
+        }
+
+        // Carbon Fiber Ducktail Spoiler
+        const spW = w * 0.78, spH = 7;
+        const spX = -spW / 2, spY = bY - 2;
+        ctx.fillStyle = '#111827';
+        ctx.beginPath();
+        ctx.roundRect(spX, spY, spW, spH, 3);
+        ctx.fill();
+        ctx.strokeStyle = carThemeColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Roof Top Profile
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.roundRect(-cabTopW / 2 - 2, cabTopY - 4, cabTopW + 4, 6, [4, 4, 0, 0]);
+        ctx.fill();
+
+        // High-Mount Center Brake Light
+        ctx.fillStyle = player.isBraking ? '#ff1133' : '#660011';
+        ctx.fillRect(-18, cabTopY - 1, 36, 3);
+
+        // Modern LED Light-Blade Taillights
+        const tlY = bY + 6, tlH = 9;
+        const tlLeft = bX + 22, tlRight = -bX - 22;
+        const isBrake = player.isBraking;
+
+        // Taillight background strip
+        ctx.fillStyle = '#150505';
+        ctx.fillRect(tlLeft, tlY, tlRight - tlLeft, tlH);
+
+        // Active glowing light bar
+        ctx.save();
+        ctx.shadowColor = isBrake ? '#ff0033' : '#ff0055';
+        ctx.shadowBlur = isBrake ? 18 : 8;
+        ctx.fillStyle = isBrake ? '#ff2244' : '#e11d48';
+        ctx.beginPath();
+        ctx.roundRect(tlLeft + 2, tlY + 1.5, tlRight - tlLeft - 4, tlH - 3, 2);
+        ctx.fill();
+
+        // High-intensity brake accents
+        if (isBrake) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(tlLeft + 6, tlY + 3, 28, 3);
+            ctx.fillRect(tlRight - 34, tlY + 3, 28, 3);
+        }
+        ctx.restore();
+
+        // Dynamic Cyber Body Accent Trim
+        ctx.strokeStyle = player.isBoosting ? '#ffffff' : carThemeColor;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(bX + 18, bY + bH * 0.9);
+        ctx.lineTo(bX + 4, bY + bH * 0.35);
+        ctx.lineTo(bX + 18, bY + 2);
+        ctx.lineTo(-bX - 18, bY + 2);
+        ctx.lineTo(-bX - 4, bY + bH * 0.35);
+        ctx.lineTo(-bX - 18, bY + bH * 0.9);
+        ctx.stroke();
+
+        ctx.restore();
+    };
+
+    // ==========================================
+    // REALISTIC AI CARS (5 DISTINCT BODY TYPES)
+    // ==========================================
+    const drawRealisticAICar = (destX, destY, cw, ch, car) => {
+        const bodyType = car.bodyType || 'sports';
+        const color = car.color || '#d32f2f';
+        const isBraking = car.isBraking || false;
+
+        ctx.save();
+        ctx.translate(destX, destY);
+
+        // Ground shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.beginPath();
+        ctx.ellipse(0, 2, cw * 0.52, Math.max(3, ch * 0.12), 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const tireW = cw * 0.16, tireH = ch * 0.35;
+        const tireY = -tireH * 0.75;
+        // Rear Tires
+        ctx.fillStyle = '#151515';
+        ctx.fillRect(-cw * 0.48, tireY, tireW, tireH);
+        ctx.fillRect(cw * 0.32, tireY, tireW, tireH);
+
+        // Wheels inner shadow
+        ctx.fillStyle = '#333';
+        ctx.fillRect(-cw * 0.46, tireY + 2, 2, tireH - 4);
+        ctx.fillRect(cw * 0.44, tireY + 2, 2, tireH - 4);
+
+        if (bodyType === 'suv') {
+            // SUV: Taller, boxier, silver skid plate, high roofline
+            const bH = ch * 0.75;
+            const bW = cw * 0.88;
+            const bY = -bH;
+
+            // Skid plate
+            ctx.fillStyle = '#718096';
+            ctx.fillRect(-bW * 0.28, -ch * 0.12, bW * 0.56, ch * 0.1);
+
+            // Lower bumper
+            ctx.fillStyle = '#1a202c';
+            ctx.fillRect(-bW * 0.48, -ch * 0.28, bW * 0.96, ch * 0.2);
+
+            // Main SUV Body
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(-bW * 0.46, bY + ch * 0.28, bW * 0.92, bH * 0.65, [4, 4, 2, 2]);
+            ctx.fill();
+
+            // Large SUV Rear Window
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.roundRect(-bW * 0.38, bY, bW * 0.76, bH * 0.38, [6, 6, 2, 2]);
+            ctx.fill();
+
+            // Roof Rails
+            ctx.fillStyle = '#a0aec0';
+            ctx.fillRect(-bW * 0.38, bY - 3, bW * 0.08, 4);
+            ctx.fillRect(bW * 0.30, bY - 3, bW * 0.08, 4);
+
+            // Tall Vertical LED Taillights
+            ctx.fillStyle = isBraking ? '#ff0033' : '#c53030';
+            ctx.fillRect(-bW * 0.45, bY + ch * 0.18, bW * 0.09, ch * 0.32);
+            ctx.fillRect(bW * 0.36, bY + ch * 0.18, bW * 0.09, ch * 0.32);
+
+            // Center high brake light
+            ctx.fillStyle = isBraking ? '#ff2244' : '#742a2a';
+            ctx.fillRect(-14, bY + 2, 28, 4);
+
+        } else if (bodyType === 'sedan') {
+            // SEDAN: Distinct trunk lid, wide horizontal taillights, chrome trim
+            const bH = ch * 0.65;
+            const bW = cw * 0.9;
+            const bY = -bH;
+
+            // Exhausts
+            ctx.fillStyle = '#718096';
+            ctx.fillRect(-bW * 0.35, -ch * 0.08, 10, 6);
+            ctx.fillRect(bW * 0.35 - 10, -ch * 0.08, 10, 6);
+
+            // Lower Bumper
+            ctx.fillStyle = '#1f2937';
+            ctx.fillRect(-bW * 0.46, -ch * 0.22, bW * 0.92, ch * 0.18);
+
+            // Main Body / Trunk
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(-bW * 0.47, bY + ch * 0.22, bW * 0.94, bH * 0.68, [6, 6, 3, 3]);
+            ctx.fill();
+
+            // Rear Windshield
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(-bW * 0.42, bY + ch * 0.22);
+            ctx.lineTo(-bW * 0.32, bY);
+            ctx.lineTo(bW * 0.32, bY);
+            ctx.lineTo(bW * 0.42, bY + ch * 0.22);
+            ctx.closePath();
+            ctx.fill();
+
+            // Chrome Trunk Trim
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillRect(-bW * 0.25, bY + ch * 0.26, bW * 0.5, 3);
+
+            // Horizontal Taillight Clusters with Amber Indicators
+            const tlW = bW * 0.28, tlH = ch * 0.16;
+            ctx.fillStyle = isBraking ? '#ff1133' : '#dc2626';
+            ctx.fillRect(-bW * 0.45, bY + ch * 0.28, tlW, tlH);
+            ctx.fillRect(bW * 0.45 - tlW, bY + ch * 0.28, tlW, tlH);
+            // Amber indicator edges
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(-bW * 0.45, bY + ch * 0.28, 6, tlH);
+            ctx.fillRect(bW * 0.45 - 6, bY + ch * 0.28, 6, tlH);
+
+        } else if (bodyType === 'supercar') {
+            // SUPERCAR: Ultra-low, active wing, quad exhausts, massive diffuser
+            const bH = ch * 0.52;
+            const bW = cw * 0.96;
+            const bY = -bH;
+
+            // Carbon Diffuser with Strakes
+            ctx.fillStyle = '#09090b';
+            ctx.fillRect(-bW * 0.42, -ch * 0.18, bW * 0.84, ch * 0.2);
+            ctx.fillStyle = '#27272a';
+            ctx.fillRect(-bW * 0.18, -ch * 0.18, 3, ch * 0.2);
+            ctx.fillRect(0, -ch * 0.18, 3, ch * 0.2);
+            ctx.fillRect(bW * 0.18, -ch * 0.18, 3, ch * 0.2);
+
+            // Quad Exhausts in Center
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(-12, -ch * 0.12, 6, 6);
+            ctx.fillRect(-4, -ch * 0.12, 6, 6);
+            ctx.fillRect(4, -ch * 0.12, 6, 6);
+            ctx.fillRect(12, -ch * 0.12, 6, 6);
+
+            // Supercar Body
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(-bW * 0.48, 0);
+            ctx.lineTo(-bW * 0.44, bY + ch * 0.18);
+            ctx.lineTo(-bW * 0.32, bY);
+            ctx.lineTo(bW * 0.32, bY);
+            ctx.lineTo(bW * 0.44, bY + ch * 0.18);
+            ctx.lineTo(bW * 0.48, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Engine Glass Deck
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(-bW * 0.28, bY + ch * 0.18);
+            ctx.lineTo(-bW * 0.2, bY);
+            ctx.lineTo(bW * 0.2, bY);
+            ctx.lineTo(bW * 0.28, bY + ch * 0.18);
+            ctx.closePath();
+            ctx.fill();
+
+            // Active Aero Wing
+            ctx.fillStyle = '#18181b';
+            ctx.fillRect(-bW * 0.42, bY - 8, bW * 0.84, 5);
+            ctx.fillStyle = '#52525b';
+            ctx.fillRect(-bW * 0.24, bY - 3, 3, 5);
+            ctx.fillRect(bW * 0.24, bY - 3, 3, 5);
+
+            // Angular Hypercar LED Light Blades
+            ctx.fillStyle = isBraking ? '#ff0033' : '#ef4444';
+            ctx.fillRect(-bW * 0.42, bY + ch * 0.16, bW * 0.3, 4);
+            ctx.fillRect(bW * 0.12, bY + ch * 0.16, bW * 0.3, 4);
+
+        } else if (bodyType === 'muscle') {
+            // MUSCLE CAR: Broad shoulders, blackout panel, triple vertical lights
+            const bH = ch * 0.62;
+            const bW = cw * 0.94;
+            const bY = -bH;
+
+            // Dual fat rectangular exhausts
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(-bW * 0.36, -ch * 0.08, 14, 7);
+            ctx.fillRect(bW * 0.36 - 14, -ch * 0.08, 14, 7);
+
+            // Muscular Body
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(-bW * 0.48, bY + ch * 0.2, bW * 0.96, bH * 0.72, [2, 2, 4, 4]);
+            ctx.fill();
+
+            // Slanted Fastback Rear Window
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(-bW * 0.42, bY + ch * 0.22);
+            ctx.lineTo(-bW * 0.34, bY);
+            ctx.lineTo(bW * 0.34, bY);
+            ctx.lineTo(bW * 0.42, bY + ch * 0.22);
+            ctx.closePath();
+            ctx.fill();
+
+            // Ducktail Spoiler
+            ctx.fillStyle = '#111';
+            ctx.fillRect(-bW * 0.44, bY + ch * 0.18, bW * 0.88, 4);
+
+            // Blackout Taillight Deck Panel
+            ctx.fillStyle = '#09090b';
+            ctx.fillRect(-bW * 0.42, bY + ch * 0.26, bW * 0.84, ch * 0.2);
+
+            // Iconic Triple Vertical Taillights (Left & Right)
+            const lightCol = isBraking ? '#ff0033' : '#b91c1c';
+            ctx.fillStyle = lightCol;
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(-bW * 0.38 + i * 10, bY + ch * 0.28, 6, ch * 0.16);
+                ctx.fillRect(bW * 0.38 - 6 - i * 10, bY + ch * 0.28, 6, ch * 0.16);
+            }
+
+        } else {
+            // SPORTS COUPE: Default sleek aerodynamic rear
+            const bH = ch * 0.58;
+            const bW = cw * 0.92;
+            const bY = -bH;
+
+            // Exhausts
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.arc(-bW * 0.32, -ch * 0.05, 5, 0, Math.PI * 2);
+            ctx.arc(bW * 0.32, -ch * 0.05, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Sports Body
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(-bW * 0.46, bY + ch * 0.2, bW * 0.92, bH * 0.72, [8, 8, 3, 3]);
+            ctx.fill();
+
+            // Rear Windshield
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.moveTo(-bW * 0.38, bY + ch * 0.2);
+            ctx.lineTo(-bW * 0.28, bY);
+            ctx.lineTo(bW * 0.28, bY);
+            ctx.lineTo(bW * 0.38, bY + ch * 0.2);
+            ctx.closePath();
+            ctx.fill();
+
+            // Lip spoiler
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-bW * 0.4, bY + ch * 0.17, bW * 0.8, 3);
+
+            // Slim Continuous LED Taillight Strip
+            ctx.fillStyle = isBraking ? '#ff1133' : '#ef4444';
+            ctx.fillRect(-bW * 0.4, bY + ch * 0.25, bW * 0.8, 5);
+        }
+
+        ctx.restore();
+    };
+
+    // ==========================================
+    // PLAYER CONTROLS & PHYSICS ENGINE
+    // ==========================================
+    const update = (dt) => {
+        // 3-2-1 START NOW COUNTDOWN SEQUENCE
+        if (state === 'COUNTDOWN') {
+            globalTime += 1;
+            countdownTimer -= dt;
+
+            // Engine rev test if player presses Gas during countdown
+            const isGas = Input.keys['ArrowUp'] || Input.keys['KeyW'];
+            if (isGas && Math.random() > 0.82) {
+                AudioEngine.rev();
+            }
+
+            // Keep rival cars revving on the starting line grid
+            cars.forEach(car => {
+                if (car.isAI) {
+                    car.speed = 0;
+                }
+            });
+
+            const redLight = document.getElementById('gantry-red');
+            const yellowLight = document.getElementById('gantry-yellow');
+            const greenLight = document.getElementById('gantry-green');
+            const cdText = document.getElementById('countdown-text');
+            const cdSubtext = document.getElementById('countdown-subtext');
+
+            if (countdownTimer > 2.4) {
+                if (countdownStep !== 3) {
+                    countdownStep = 3;
+                    if (redLight) redLight.className = 'gantry-light red active';
+                    if (yellowLight) yellowLight.className = 'gantry-light yellow';
+                    if (greenLight) greenLight.className = 'gantry-light green';
+                    if (cdText) {
+                        cdText.innerText = '3';
+                        cdText.style.color = '#ff0033';
+                        cdText.style.textShadow = '0 0 35px #ff0033';
+                    }
+                    if (cdSubtext) cdSubtext.innerText = 'REV YOUR ENGINES!';
+                    AudioEngine.countdownLow();
+                }
+            } else if (countdownTimer > 1.4) {
+                if (countdownStep !== 2) {
+                    countdownStep = 2;
+                    if (redLight) redLight.className = 'gantry-light red';
+                    if (yellowLight) yellowLight.className = 'gantry-light yellow active';
+                    if (greenLight) greenLight.className = 'gantry-light green';
+                    if (cdText) {
+                        cdText.innerText = '2';
+                        cdText.style.color = '#ffcc00';
+                        cdText.style.textShadow = '0 0 35px #ffcc00';
+                    }
+                    if (cdSubtext) cdSubtext.innerText = 'GET READY!';
+                    AudioEngine.countdownLow();
+                }
+            } else if (countdownTimer > 0.4) {
+                if (countdownStep !== 1) {
+                    countdownStep = 1;
+                    if (redLight) redLight.className = 'gantry-light red';
+                    if (yellowLight) yellowLight.className = 'gantry-light yellow active';
+                    if (greenLight) greenLight.className = 'gantry-light green';
+                    if (cdText) {
+                        cdText.innerText = '1';
+                        cdText.style.color = '#ffcc00';
+                        cdText.style.textShadow = '0 0 35px #ffcc00';
+                    }
+                    if (cdSubtext) cdSubtext.innerText = 'HOLD CLUTCH!';
+                    AudioEngine.countdownLow();
+                }
+            } else if (countdownTimer > -0.6) {
+                if (countdownStep !== 0) {
+                    countdownStep = 0;
+                    if (redLight) redLight.className = 'gantry-light red';
+                    if (yellowLight) yellowLight.className = 'gantry-light yellow';
+                    if (greenLight) greenLight.className = 'gantry-light green active';
+                    if (cdText) {
+                        cdText.innerText = 'START NOW!';
+                        cdText.style.color = '#00ff66';
+                        cdText.style.textShadow = '0 0 50px #00ff66';
+                    }
+                    if (cdSubtext) cdSubtext.innerText = 'FULL THROTTLE!';
+                    AudioEngine.countdownGo();
+                    
+                    // ALL RIVAL CARS ON THE GRID LAUNCH FORWARD SIMULTANEOUSLY!
+                    cars.forEach(car => {
+                        if (car.isAI) {
+                            car.speed = car.baseSpeed * 0.48;
+                        }
+                    });
+                }
+            } else {
+                state = 'PLAYING';
+                document.getElementById('countdown-overlay').classList.add('hidden');
+            }
+            return;
+        }
+
+        if (state !== 'PLAYING') return;
+        globalTime += 1;
+
+        if (trackLength > 0) {
+            if (player.z < 0) player.z = (player.z % trackLength) + trackLength;
+            if (player.z >= trackLength) {
+                player.z = player.z % trackLength;
+                player.lap = (player.lap || 0) + 1;
+            }
+        }
+
+        const seg = findSegment(player.z) || { curve: 0, sprites: [] };
+        const speedPercent = player.speed / MAX_SPEED;
+
+        // Player Control Inputs
+        const isGas = Input.keys['ArrowUp'] || Input.keys['KeyW'];
+        const isBrake = Input.keys['ArrowDown'] || Input.keys['KeyS'];
+        const isNitro = (Input.keys['Space'] || Input.keys['KeyN']) && player.nitro > 0;
+
+        player.isBoosting = isNitro;
+        player.isBraking = isBrake;
+        player.isAccelerating = isGas;
+
+        // Realistic Acceleration & Deceleration Dynamics
+        if (isNitro) {
+            player.speed = Math.min(MAX_SPEED * 1.35, player.speed + (ACCEL * 2.8 * dt));
+            player.nitro = Math.max(0, player.nitro - 28 * dt);
+            if (Math.random() > 0.82) AudioEngine.boost();
+        } else if (isGas) {
+            player.speed = Math.min(MAX_SPEED, player.speed + (ACCEL * dt * 0.95));
+            player.nitro = Math.min(100, player.nitro + 6 * dt);
+        } else if (isBrake) {
+            player.speed = Math.max(0, player.speed + (BREAKING * dt * 1.5));
+            player.nitro = Math.min(100, player.nitro + 6 * dt);
+        } else {
+            // Natural coasting deceleration when no controls are pressed
+            player.speed = Math.max(0, player.speed - (ACCEL * 0.48 * dt));
+            player.nitro = Math.min(100, player.nitro + 6 * dt);
+        }
+
+        // Steering (Responsive with chassis roll)
+        const steerSpeed = dt * 3.4 * (speedPercent > 0.05 ? speedPercent : 0.05);
+        if (Input.keys['ArrowLeft'] || Input.keys['KeyA']) {
+            player.x -= steerSpeed;
+            player.steerAngle = Math.max(-1, player.steerAngle - 0.25);
+        } else if (Input.keys['ArrowRight'] || Input.keys['KeyD']) {
+            player.x += steerSpeed;
+            player.steerAngle = Math.min(1, player.steerAngle + 0.25);
+        } else {
+            player.steerAngle *= 0.82;
+        }
+
+        // Road curve pull proportional to speed
+        player.x -= dt * speedPercent * (seg.curve || 0) * 1.8;
+
+        if (levelUpAnim > 0) levelUpAnim--;
+        if (crashCooldown > 0) crashCooldown -= dt;
+
+        // Road Boundary & Off-road Deceleration
+        const maxRoadX = 0.95;
+        if (Math.abs(player.x) > maxRoadX) {
+            player.x = player.x > 0 ? maxRoadX : -maxRoadX;
+            if (player.speed > OFF_ROAD_LIMIT) {
+                player.speed += OFF_ROAD_DECEL * 0.5 * dt;
+            }
+        }
+
+        // Collectibles Collision (Multi-segment reach around player car body)
+        const currentSegIndex = Math.floor(player.z / SEGMENT_LENGTH);
+        for (let offset = -1; offset <= 2; offset++) {
+            let chkIdx = (currentSegIndex + offset) % segments.length;
+            if (chkIdx < 0) chkIdx += segments.length;
+            const cSeg = segments[chkIdx];
+            if (cSeg && cSeg.sprites && cSeg.sprites.length) {
+                for (let idx = cSeg.sprites.length - 1; idx >= 0; idx--) {
+                    const s = cSeg.sprites[idx];
+                    if (s && (s.type === 'coin' || s.type === 'fuel' || s.type === 'nitro_box')) {
+                        if (Math.abs(player.x - s.x) < 0.72) {
+                            const isMob = window.matchMedia('(hover: none) and (pointer: coarse), (max-width: 860px)').matches;
+                            if (s.type === 'coin') { 
+                                player.coins++; 
+                                totalCoins++; 
+                                saveProgress(); 
+                                AudioEngine.coin(); 
+                                cSeg.sprites.splice(idx, 1);
+                                
+                                floatingPickups.push({
+                                    text: '+1 🪙',
+                                    x: WIDTH / 2 + (player.x * WIDTH * 0.32),
+                                    y: isMob ? (HEIGHT - 245) : (HEIGHT - 145),
+                                    alpha: 1.0,
+                                    color: '#ffd700'
+                                });
+
+                                const coinEl = document.getElementById('val-coins');
+                                if (coinEl) {
+                                    coinEl.innerText = player.coins;
+                                    coinEl.style.color = '#ffd700';
+                                    coinEl.style.textShadow = '0 0 16px #ffd700';
+                                    coinEl.style.transform = 'scale(1.3)';
+                                    coinEl.style.transition = 'all 0.12s ease-out';
+                                    setTimeout(() => {
+                                        if (coinEl) {
+                                            coinEl.style.color = '';
+                                            coinEl.style.textShadow = '';
+                                            coinEl.style.transform = 'scale(1.0)';
+                                        }
+                                    }, 180);
+                                }
+                                const coinProgEl = document.getElementById('val-coinprog');
+                                if (coinProgEl) {
+                                    coinProgEl.innerText = player.coins;
+                                }
+                            } else if (s.type === 'fuel') { 
+                                player.fuel = Math.min(100, player.fuel + 40); 
+                                AudioEngine.click(); 
+                                cSeg.sprites.splice(idx, 1); 
+                                floatingPickups.push({
+                                    text: '+FUEL ⛽',
+                                    x: WIDTH / 2 + (player.x * WIDTH * 0.32),
+                                    y: isMob ? (HEIGHT - 245) : (HEIGHT - 145),
+                                    alpha: 1.0,
+                                    color: '#ff4444'
+                                });
+                            } else if (s.type === 'nitro_box') { 
+                                player.nitro = 100; 
+                                player.fuel = Math.min(100, player.fuel + 35); 
+                                player.speed = Math.min(MAX_SPEED * 1.45, player.speed + (ACCEL * 1.5));
+                                player.isBoosting = true;
+                                AudioEngine.boost(); 
+                                cSeg.sprites.splice(idx, 1); 
+                                floatingPickups.push({
+                                    text: '⚡ SUPER NITRO 100%! ⚡',
+                                    x: WIDTH / 2 + (player.x * WIDTH * 0.32),
+                                    y: isMob ? (HEIGHT - 245) : (HEIGHT - 145),
+                                    alpha: 1.0,
+                                    color: '#00f2ff'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // AI Cars & Traffic Updates
+        cars.forEach(car => {
+            if (trackLength > 0) {
+                if (car.z < 0) car.z = (car.z % trackLength) + trackLength;
+                if (car.z >= trackLength) car.z = car.z % trackLength;
+            }
+
+            if (car.isAI) {
+                if (car.speed < car.baseSpeed) car.speed += 110 * dt;
+
+                // AI Nitro for fast cars
+                if (car.name === "Fast" && car.nitro > 0 && Math.random() > 0.98) {
+                    car.isBoosting = true;
+                }
+                if (car.isBoosting) {
+                    car.nitro -= 25 * dt;
+                    if (car.nitro <= 0) { car.isBoosting = false; car.nitro = 0; }
+                } else if (car.nitro < 100) {
+                    car.nitro += 5 * dt;
+                }
+
+                let currentSpeed = car.speed * (car.isBoosting ? 1.35 : 1.0);
+                car.raceDistance += currentSpeed * dt;
+                car.z += currentSpeed * dt;
+
+                if (trackLength > 0) {
+                    if (car.z >= trackLength) { car.z -= trackLength; car.lap = (car.lap || 0) + 1; }
+                    if (car.z < 0) car.z += trackLength;
+                }
+
+                const aiSeg = findSegment(car.z);
+                if (aiSeg) {
+                    car.targetOffset -= dt * ((aiSeg.curve || 0) * 0.1);
+                }
+
+                for (let other of cars) {
+                    if (other === car) continue;
+                    let otherOffset = other.offset || 0;
+                    if (Math.abs(car.z - other.z) < 400 && Math.abs(car.offset - otherOffset) < 0.4) {
+                        car.targetOffset = otherOffset > 0 ? -0.6 : 0.6;
+                    }
+                }
+
+                car.targetOffset = Math.max(-0.85, Math.min(0.85, car.targetOffset));
+                car.offset += (car.targetOffset - car.offset) * dt * 2.5;
+
+                // Collision with AI Rivals
+                if (Math.abs(player.z - car.z) < 85 && Math.abs(player.x - car.offset) < 0.35) {
+                    if (crashCooldown <= 0) {
+                        AudioEngine.crash(); 
+                        player.speed = Math.max(player.speed * 0.78, MAX_SPEED * 0.35);
+                        player.x += (player.x > car.offset ? 0.18 : -0.18);
+                        player.crashes++;
+                        crashCooldown = 1.6;
+                    }
+                }
+            } else {
+                // Regular Traffic
+                car.z += car.speed * dt; 
+                if (trackLength > 0) {
+                    if (car.z >= trackLength) car.z -= trackLength;
+                    if (car.z < 0) car.z += trackLength;
+                }
+
+                if (Math.abs(player.z - car.z) < 85 && Math.abs(player.x - car.offset) < 0.38) {
+                    if (crashCooldown <= 0) {
+                        AudioEngine.crash(); 
+                        player.speed = Math.max(player.speed * 0.72, MAX_SPEED * 0.30);
+                        player.x += (player.x > car.offset ? 0.20 : -0.20);
+                        player.crashes++;
+                        crashCooldown = 1.6;
+                    }
+                }
+            }
+        });
+
+        // Calculate Race Position
+        player.raceDistance = player.z + (player.lap || 0) * (trackLength || 1);
+        let position = 1;
+        cars.forEach(car => {
+            if (car.isAI && car.raceDistance > player.raceDistance) position++;
+        });
+        currentRacePosition = position;
+
+        // Player Distance & Track Progress
+        player.z += player.speed * dt;
+        if (trackLength > 0) {
+            if (player.z >= trackLength) {
+                player.z -= trackLength;
+                player.lap = (player.lap || 0) + 1;
+            }
+            if (player.z < 0) {
+                player.z = (player.z % trackLength) + trackLength;
+            }
+        }
+
+        // REALISTIC DISTANCE & 6-SPEED TRANSMISSION DYNAMICS
+        const speedKmh = Math.floor((player.speed / MAX_SPEED) * 260);
+        player.distanceMeters += (speedKmh / 3.6) * dt;
+
+        // 6-Speed Transmission Gear Calculation
+        let gear = 1, minSpd = 0, maxSpd = 45;
+        if (speedKmh < 45) { gear = 1; minSpd = 0; maxSpd = 45; }
+        else if (speedKmh < 88) { gear = 2; minSpd = 42; maxSpd = 88; }
+        else if (speedKmh < 135) { gear = 3; minSpd = 84; maxSpd = 135; }
+        else if (speedKmh < 185) { gear = 4; minSpd = 130; maxSpd = 185; }
+        else if (speedKmh < 230) { gear = 5; minSpd = 180; maxSpd = 230; }
+        else { gear = 6; minSpd = 225; maxSpd = 285; }
+
+        // Mechanical gear shifting sound on shift
+        if (player.lastGear && player.lastGear !== gear) {
+            AudioEngine.gearShift();
+        }
+        player.lastGear = gear;
+
+        // Dynamic Tachometer RPM calculation
+        const gearProg = Math.max(0, Math.min(1, (speedKmh - minSpd) / (maxSpd - minSpd)));
+        let rpm = Math.round(1800 + gearProg * 6500);
+        if (player.speed < 120) {
+            rpm = player.isAccelerating ? 3200 : 980;
+        }
+        player.rpm = rpm;
+        player.gear = gear;
+
+        // Tire screech on sharp drifting turns
+        const isDrifting = Math.abs(player.steerAngle) > 0.65 && speedPercent > 0.35;
+
+        // Turbo blow-off whoosh sound when boost stops
+        if (player.wasBoosting && !player.isBoosting) {
+            AudioEngine.turboBlowOff();
+        }
+        player.wasBoosting = player.isBoosting;
+
+        // Real-time Web Audio Synthesizer Update (Engine Pitch, Resonance, Boost Roar, Tire Screech)
+        AudioEngine.updateEngine(rpm, speedPercent, player.isBoosting, player.isBraking, isDrifting);
+
+        // Fuel Consumption only when engine is speeding
+        if (player.speed > 100) {
+            player.fuel -= 0.40 * dt * (player.speed / MAX_SPEED);
+            if (player.fuel <= 0) {
+                player.fuel = 25; // Emergency reserve so the race never abruptly fails
+            }
+        }
+
+        // Check Level Complete Goal (Reaching Finish Line)
+        if (currentLevelConfig) {
+            const distMeters = Math.floor(player.distanceMeters);
+            if (distMeters >= currentLevelConfig.targetDist) {
+                levelComplete();
+                return;
+            }
+        }
+
+        updateHUD();
+        skyOffset += (seg.curve || 0) * speedPercent * 0.5;
+    };
+
+    const render = () => {
+        ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+        // Professional 3D Showroom Turntable Stage for Main Menu
+        if (state === 'MENU') {
+            const bgGrad = ctx.createRadialGradient(WIDTH / 2, HEIGHT * 0.65, 30, WIDTH / 2, HEIGHT * 0.65, WIDTH * 0.7);
+            bgGrad.addColorStop(0, '#101c2e');
+            bgGrad.addColorStop(0.55, '#070b14');
+            bgGrad.addColorStop(1, '#020408');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            const podX = WIDTH / 2;
+            const podY = HEIGHT * 0.74;
+            const podRadiusX = Math.min(WIDTH * 0.42, 340);
+            const podRadiusY = podRadiusX * 0.32;
+
+            // Turntable Base Glow
+            ctx.save();
+            ctx.shadowColor = selectedCarColor || '#00f2ff';
+            ctx.shadowBlur = 24;
+            ctx.strokeStyle = selectedCarColor || '#00f2ff';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.ellipse(podX, podY, podRadiusX, podRadiusY, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Turntable Floor
+            ctx.fillStyle = '#0a101d';
+            ctx.fill();
+
+            // Rotating radial grid lines
+            const rot = (globalTime * 0.02) % (Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+            ctx.lineWidth = 1;
+            for (let a = 0; a < 8; a++) {
+                const ang = rot + (a * Math.PI / 4);
+                ctx.beginPath();
+                ctx.moveTo(podX, podY);
+                ctx.lineTo(podX + Math.cos(ang) * podRadiusX * 0.95, podY + Math.sin(ang) * podRadiusY * 0.95);
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // Turntable Underglow reflection
+            ctx.fillStyle = selectedCarColor || '#00f2ff';
+            ctx.globalAlpha = 0.22;
+            ctx.beginPath();
+            ctx.ellipse(podX, podY + 14, 130, 18, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Draw player car in showroom
+            drawRealisticPlayerCar(podX, podY - 18 + Math.sin(globalTime * 0.06) * 2, 1.15);
+            return;
+        }
+
+        const speedPercent = player.speed / MAX_SPEED;
+
+        ctx.save();
+        // 100% Rock-Solid Horizon & Road: Zero vertical up-and-down shaking
+        if (crashCooldown > 0) {
+            const crashShakeX = (Math.random() * 2 - 1) * Math.min(3.5, crashCooldown * 4.0);
+            ctx.translate(crashShakeX, 0);
+        }
+
+        // Sky gradient
+        const sky1 = levelEnv.sky1 || '#1a82b8';
+        const sky2 = levelEnv.sky2 || '#020b1a';
+        const grad = ctx.createLinearGradient(0, 0, 0, HEIGHT / 2);
+        grad.addColorStop(0, sky1);
+        grad.addColorStop(1, sky2);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, WIDTH, HEIGHT / 2);
+
+        // Distant Mountains & Horizon Silhouette
+        ctx.fillStyle = levelEnv.mountain || '#050505';
+        const mCount = currentLevelConfig ? currentLevelConfig.mountainCount : 6;
+        for (let i = 0; i < mCount; i++) {
+            let mWidth = WIDTH / 2.2;
+            let ox = ((i * mWidth) + skyOffset * 45) % (WIDTH + mWidth) - mWidth;
+            let mHeight = 110 + (i % 3) * 45;
+            ctx.beginPath(); 
+            ctx.moveTo(ox, HEIGHT / 2); 
+            ctx.lineTo(ox + mWidth / 2, HEIGHT / 2 - mHeight); 
+            ctx.lineTo(ox + mWidth, HEIGHT / 2); 
+            ctx.fill();
+        }
+
+        // Distant High-Rise City Skyline with Illuminated Skyscraper Windows
+        const bldgWidth = 48;
+        const bldgCount = Math.ceil(WIDTH / bldgWidth) + 4;
+        const cityScroll = (skyOffset * 70) % (WIDTH + bldgWidth * 2);
+        
+        for (let b = 0; b < bldgCount; b++) {
+            const bx = ((b * bldgWidth) + cityScroll) % (WIDTH + bldgWidth * 2) - bldgWidth;
+            const seed = (b * 11) % 6;
+            const bh = 45 + seed * 20;
+            const by = HEIGHT / 2 - bh;
+            
+            // Skyscraper silhouette
+            ctx.fillStyle = '#0a101d';
+            ctx.fillRect(bx, by, bldgWidth - 3, bh);
+            
+            // Rooftop antenna on select high-rises
+            if (seed === 5 || seed === 3) {
+                ctx.fillStyle = '#64748b';
+                ctx.fillRect(bx + bldgWidth * 0.5 - 1, by - 12, 2, 12);
+                ctx.fillStyle = '#ff0033';
+                ctx.beginPath();
+                ctx.arc(bx + bldgWidth * 0.5, by - 12, 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Distant glowing window rows
+            ctx.fillStyle = (b % 2 === 0) ? 'rgba(255, 220, 100, 0.45)' : 'rgba(0, 242, 255, 0.40)';
+            for (let wy = by + 6; wy < HEIGHT / 2 - 4; wy += 9) {
+                if ((seed + wy) % 2 === 0) {
+                    ctx.fillRect(bx + 4, wy, 3, 3);
+                    ctx.fillRect(bx + bldgWidth - 11, wy, 3, 3);
+                }
+            }
+        }
+
+        if (trackLength > 0 && player.z < 0) {
+            player.z = (player.z % trackLength) + trackLength;
+        }
+        const baseSeg = findSegment(player.z);
+        if (!baseSeg || !segments || segments.length === 0) return;
+
+        const basePercent = Math.max(0, Math.min(1, (player.z % SEGMENT_LENGTH) / SEGMENT_LENGTH));
+        const playerY = (1 - basePercent) * (baseSeg.p1?.world?.y || 0) + basePercent * (baseSeg.p2?.world?.y || 0);
+        let maxY = HEIGHT, x = 0, dx = -((baseSeg.curve || 0) * basePercent);
+
+        for (let n = 0; n < DRAW_DISTANCE; n++) {
+            let segIdx = (baseSeg.index + n) % segments.length;
+            if (segIdx < 0) segIdx = (segIdx % segments.length) + segments.length;
+            const segment = segments[segIdx];
+            if (!segment) continue;
+
+            const looped = segment.index < baseSeg.index;
+            project(segment.p1, player.x * ROAD_WIDTH - x, playerY + CAMERA_HEIGHT, player.z - (looped ? trackLength : 0), WIDTH, HEIGHT);
+            project(segment.p2, player.x * ROAD_WIDTH - x - dx, playerY + CAMERA_HEIGHT, player.z - (looped ? trackLength : 0), WIDTH, HEIGHT);
+            x += dx; 
+            dx += (segment.curve || 0);
+            if ((segment.p1.camera.z <= CAMERA_DEPTH) || (segment.p2.screen.y >= maxY)) continue;
+            drawSegment(segment);
+            maxY = segment.p2.screen.y;
+        }
+
+        for (let n = DRAW_DISTANCE - 1; n > 0; n--) {
+            let segIdx = (baseSeg.index + n) % segments.length;
+            if (segIdx < 0) segIdx = (segIdx % segments.length) + segments.length;
+            const segment = segments[segIdx];
+            if (!segment) continue;
+
+            if (segment.sprites && segment.sprites.length) {
+                segment.sprites.forEach(s => drawSprite(s, segment));
+            }
+
+            cars.forEach(car => {
+                let carSegIdx = Math.floor(car.z / SEGMENT_LENGTH) % segments.length;
+                if (carSegIdx < 0) carSegIdx = (carSegIdx % segments.length) + segments.length;
+                if (carSegIdx === segment.index) {
+                    const scale = segment.p1.screen.scale;
+                    const destX = segment.p1.screen.x + (scale * car.offset * ROAD_WIDTH * WIDTH / 2);
+                    const destY = segment.p1.screen.y;
+                    const cw = 440 * scale * (WIDTH / 2), ch = 220 * scale * (WIDTH / 2);
+                    drawRealisticAICar(destX, destY, cw, ch, car);
+                }
+            });
+        }
+
+        drawRealisticPlayerCar();
+
+        // High-Speed Peripheral Optical Lines during Nitro or Top Speed
+        if (player.isBoosting || speedPercent > 0.90) {
+            const numLines = player.isBoosting ? 14 : 8;
+            ctx.save();
+            ctx.strokeStyle = player.isBoosting ? 'rgba(0, 242, 255, 0.45)' : 'rgba(255, 255, 255, 0.22)';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < numLines; i++) {
+                const side = i % 2 === 0 ? 1 : -1;
+                const edgeX = side > 0 ? WIDTH - Math.random() * 110 : Math.random() * 110;
+                const startY = HEIGHT * 0.25 + Math.random() * (HEIGHT * 0.7);
+                const len = 35 + Math.random() * 65;
+                ctx.beginPath();
+                ctx.moveTo(edgeX, startY);
+                ctx.lineTo(edgeX + side * 14, startY + len);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // Floating Pickup Text Effects (+1 🪙, +FUEL ⛽, +NITRO ⚡)
+        for (let i = floatingPickups.length - 1; i >= 0; i--) {
+            const fp = floatingPickups[i];
+            fp.y -= 2.2;
+            fp.alpha -= 0.024;
+            if (fp.alpha <= 0) {
+                floatingPickups.splice(i, 1);
+                continue;
+            }
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, fp.alpha);
+            ctx.font = 'bold 22px monospace';
+            ctx.fillStyle = fp.color;
+            ctx.shadowColor = fp.color;
+            ctx.shadowBlur = 12;
+            ctx.textAlign = 'center';
+            ctx.fillText(fp.text, fp.x, fp.y);
+            ctx.restore();
+        }
+
+        if (currentLevelConfig) {
+            const distM = Math.floor(player.distanceMeters || 0);
+            const remaining = currentLevelConfig.targetDist - distM;
+            if (remaining > 0 && remaining <= 85) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(10, 15, 25, 0.85)';
+                ctx.fillRect(WIDTH / 2 - 130, 85, 260, 36);
+                ctx.strokeStyle = '#ffd700';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(WIDTH / 2 - 130, 85, 260, 36);
+                ctx.fillStyle = '#ffd700';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`🏁 FINISH LINE: ${remaining}m 🏁`, WIDTH / 2, 103);
+                ctx.restore();
+            }
+        }
+
+        if (levelUpAnim > 0) {
+            ctx.fillStyle = '#00f2ff'; 
+            ctx.font = 'bold 38px Arial'; 
+            ctx.textAlign = 'center'; 
+            ctx.fillText("LEVEL UP!", WIDTH / 2, HEIGHT / 3);
+        }
+
+        ctx.restore();
+    };
+
+    const updateHUD = () => {
+        const lvlEl = document.getElementById('val-level');
+        if (lvlEl) lvlEl.innerText = player.level;
+
+        const distM = Math.floor(player.distanceMeters || 0);
+        const score = Math.floor(distM * 2) + (player.bonusScore || 0);
+        
+        const scoreEl = document.getElementById('val-score');
+        if (scoreEl) scoreEl.innerText = score;
+
+        const bestEl = document.getElementById('val-best');
+        if (bestEl) bestEl.innerText = Math.floor(highscore);
+
+        const coinsEl = document.getElementById('val-coins');
+        if (coinsEl) coinsEl.innerText = Math.floor(player.nitro);
+
+        const targetD = currentLevelConfig ? currentLevelConfig.targetDist : 1000;
+        const distEl = document.getElementById('val-dist');
+        if (distEl) distEl.innerText = `${distM}/${targetD}`;
+
+        const speedKmh = Math.floor((player.speed / MAX_SPEED) * 260);
+        const speedEl = document.getElementById('val-speed');
+        if (speedEl) speedEl.innerText = speedKmh;
+
+        const fuelBar = document.getElementById('fuel-bar');
+        if (fuelBar) fuelBar.style.width = Math.max(0, player.fuel) + '%';
+
+        const nitroBar = document.getElementById('nitro-bar');
+        if (nitroBar) nitroBar.style.width = player.nitro + '%';
+        
+        // Gear & Tachometer HUD updates
+        const gearEl = document.getElementById('val-gear');
+        if (gearEl) gearEl.innerText = `GEAR ${player.gear || 1}`;
+        const rpmEl = document.getElementById('val-rpm');
+        if (rpmEl) rpmEl.innerText = `${player.rpm || 1000} RPM`;
+        const rpmBar = document.getElementById('rpm-bar-fill');
+        if (rpmBar) {
+            const rpmPct = Math.max(10, Math.min(100, ((player.rpm || 1000) / 8500) * 100));
+            rpmBar.style.width = `${rpmPct}%`;
+        }
+
+        const crashEl = document.getElementById('val-crashes');
+        if (crashEl) crashEl.innerText = player.crashes;
+        
+        const remaining = currentLevelConfig ? Math.max(0, currentLevelConfig.targetDist - distM) : 0;
+        const remEl = document.getElementById('val-remaining');
+        if (remEl) remEl.innerText = remaining;
+
+        const lvlNameEl = document.getElementById('level-name');
+        if (lvlNameEl) lvlNameEl.innerText = currentLevelConfig ? currentLevelConfig.name : 'STAGE 1';
+
+        const racePosEl = document.getElementById('race-pos');
+        if (racePosEl) racePosEl.innerText = `${Math.floor(player.nitro)}%`;
+    };
+
+    const loop = (timestamp) => {
+        if (state === 'PLAYING' || state === 'COUNTDOWN') {
+            const rawDt = lastFrameTime ? (timestamp - lastFrameTime) / 1000 : FIXED_STEP;
+            lastFrameTime = timestamp;
+            const dt = Math.min(rawDt, 0.05);
+
+            fps = Math.round(1 / (rawDt || FIXED_STEP));
+            const fpsEl = document.getElementById('fps-counter');
+            if (fpsEl) fpsEl.innerText = `FPS: ${fps}`;
+            
+            update(dt); 
+            render(); 
+            requestAnimationFrame(loop);
+        } else if (state === 'MENU') {
+            globalTime += 0.5;
+            render();
+            requestAnimationFrame(loop);
+        } else {
+            lastFrameTime = 0;
+        }
+    };
+
+    const levelComplete = () => {
+        state = 'LEVELCOMPLETE';
+        AudioEngine.stopEngine();
+        AudioEngine.victory();
+        
+        const bonus = 500;
+        player.bonusScore = (player.bonusScore || 0) + bonus;
+        const distM = Math.floor(player.distanceMeters || 0);
+        const score = Math.floor(distM * 2) + player.bonusScore;
+        
+        if (score > highscore) {
+            highscore = score;
+        }
+        
+        // Advance progress up to 120 stages!
+        if (currentLevel + 1 > unlockedLevel) {
+            unlockedLevel = Math.min(120, currentLevel + 1);
+        }
+        
+        // Award stars based on finish position & crash cleanliness
+        let stars = 1;
+        if (currentRacePosition === 1 && player.crashes === 0) {
+            stars = 3;
+        } else if (currentRacePosition <= 2 && player.crashes <= 1) {
+            stars = 2;
+        }
+        SafeStorage.setInt(`turbo_stars_lvl_${currentLevel}`, stars);
+        saveProgress();
+        
+        // Hide gameplay UI and pause
+        document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('dashboard').classList.add('hidden');
+        document.getElementById('mobile-controls').style.display = 'none';
+        
+        const overlay = document.getElementById('menu-levelcomplete');
+        overlay.classList.remove('hidden');
+        
+        const title = overlay.querySelector('.level-complete-title');
+        title.style.animation = 'none';
+        void title.offsetWidth;
+        title.style.animation = '';
+        
+        const lcLvl = document.getElementById('lc-level'); if (lcLvl) lcLvl.innerText = currentLevel;
+        const lcDist = document.getElementById('lc-distance'); if (lcDist) lcDist.innerText = distM + 'm';
+        const lcCoins = document.getElementById('lc-coins'); if (lcCoins) lcCoins.innerText = player.coins;
+        const lcScore = document.getElementById('lc-score'); if (lcScore) lcScore.innerText = Math.floor(distM * 2);
+        const lcTotal = document.getElementById('lc-total'); if (lcTotal) lcTotal.innerText = score;
+        
+        const allDone = document.getElementById('lc-allcomplete');
+        const nextBtn = document.getElementById('lc-next-btn');
+        if (currentLevel >= 120) {
+            if (allDone) { allDone.classList.remove('hidden'); allDone.innerText = '🏆 ALL 120 CHAMPIONSHIP STAGES CONQUERED! SUPREME RACING LEGEND! 🏆'; }
+            if (nextBtn) nextBtn.innerText = 'Play Again';
+        } else {
+            if (allDone) allDone.classList.add('hidden');
+            if (nextBtn) nextBtn.innerText = `Next Stage (${currentLevel + 1}/120)`;
+        }
+    };
+
+    const levelFailed = (reason) => {
+        state = 'LEVELFAILED';
+        AudioEngine.stopEngine();
+        AudioEngine.fail();
+        
+        const distM = Math.floor(player.distanceMeters || 0);
+        const score = Math.floor(distM * 2) + (player.bonusScore || 0);
+        if (score > highscore) {
+            highscore = score;
+        }
+        saveProgress();
+        
+        document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('dashboard').classList.add('hidden');
+        document.getElementById('mobile-controls').style.display = 'none';
+        
+        const overlay = document.getElementById('menu-levelfailed');
+        if (overlay) overlay.classList.remove('hidden');
+        
+        const title = overlay ? overlay.querySelector('.level-failed-title') : null;
+        if (title) {
+            title.style.animation = 'none';
+            void title.offsetWidth;
+            title.style.animation = '';
+        }
+        
+        const lfReason = document.getElementById('level-failed-reason'); if (lfReason) lfReason.innerText = reason;
+        const lfLvl = document.getElementById('lf-level'); if (lfLvl) lfLvl.innerText = currentLevel;
+        const lfDist = document.getElementById('lf-distance'); if (lfDist) lfDist.innerText = distM + 'm';
+        const lfCoins = document.getElementById('lf-coins'); if (lfCoins) lfCoins.innerText = player.coins;
+        const lfCrash = document.getElementById('lf-crashes'); if (lfCrash) lfCrash.innerText = player.crashes;
+    };
+
+    // LEVEL SELECTOR METHODS (100+ LEVELS ACROSS 12 WORLDS)
+    const renderChapterTabs = () => {
+        const strip = document.getElementById('chapter-tabs-strip');
+        if (!strip) return;
+        strip.innerHTML = '';
+        WORLDS.forEach((w, idx) => {
+            const btn = document.createElement('button');
+            btn.className = `chapter-tab-btn ${idx === selectedWorldView ? 'active' : ''}`;
+            btn.innerText = `W${idx + 1}: ${w.name.split(' ')[0]}`;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                AudioEngine.click();
+                selectedWorldView = idx;
+                renderChapterTabs();
+                renderLevelsGrid(selectedWorldView);
+            });
+            strip.appendChild(btn);
+        });
+    };
+
+    const renderLevelsGrid = (worldIdx) => {
+        const grid = document.getElementById('levels-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        
+        const startLvl = worldIdx * 10 + 1;
+        const endLvl = Math.min(120, (worldIdx + 1) * 10);
+        
+        for (let lvl = startLvl; lvl <= endLvl; lvl++) {
+            const card = document.createElement('div');
+            const isUnlocked = lvl <= unlockedLevel;
+            const stars = SafeStorage.getInt(`turbo_stars_lvl_${lvl}`, 0);
+            
+            card.className = `level-card ${isUnlocked ? 'active-unlocked' : 'locked'}`;
+            
+            const starStr = stars === 3 ? '★★★' : (stars === 2 ? '★★☆' : (stars === 1 ? '★☆☆' : '☆☆☆'));
+            const stageCfg = getLevelConfig(lvl);
+            
+            card.innerHTML = `
+                <div class="level-card-num">${lvl}</div>
+                <div class="level-card-name">${stageCfg.worldName.split(' ')[0]} #${stageCfg.stageInWorld}</div>
+                <div class="level-card-badge">${isUnlocked ? `📏 ${stageCfg.targetDist}m` : '🔒 LOCKED'}</div>
+                <div style="font-size:0.75rem; color:#ffd700; margin-top:4px;">${isUnlocked && stars > 0 ? starStr : ''}</div>
+            `;
+            
+            if (isUnlocked) {
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    AudioEngine.click();
+                    document.getElementById('menu-levelselect').classList.add('hidden');
+                    game.start(lvl);
+                });
+            }
+            grid.appendChild(card);
+        }
+    };
+
+    return {
+        init: () => {
+            state = 'MENU'; 
+            AudioEngine.stopEngine();
+            WIDTH = window.innerWidth; 
+            HEIGHT = window.innerHeight;
+            canvas.width = WIDTH; 
+            canvas.height = HEIGHT;
+            currentLevel = 1;
+            currentLevelConfig = getLevelConfig(1);
+            levelColors = currentLevelConfig.env;
+            levelEnv = currentLevelConfig.env;
+
+            buildTrack(); 
+            Input.init();
+            
+            const topStageEl = document.getElementById('top-stage');
+            if (topStageEl) topStageEl.innerText = `${unlockedLevel}/120`;
+            const topCoinsEl = document.getElementById('top-coins');
+            if (topCoinsEl) topCoinsEl.innerText = totalCoins;
+            const topBestEl = document.getElementById('top-best');
+            if (topBestEl) topBestEl.innerText = Math.floor(highscore);
+            
+            const contLvlEl = document.getElementById('menu-continue-lvl');
+            if (contLvlEl) contLvlEl.innerText = unlockedLevel;
+            const contBtn = document.getElementById('continue-btn');
+            if (contBtn) contBtn.style.display = unlockedLevel > 1 ? '' : 'none';
+            
+            document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+            document.getElementById('menu-main').classList.remove('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('mobile-controls').style.display = 'none';
+            
+            render();
+            requestAnimationFrame(loop);
+        },
+
+        start: (level) => {
+            if (level === undefined || level === null) {
+                level = currentLevel || 1;
+            }
+            currentLevel = Math.max(1, Math.min(120, level));
+            currentLevelConfig = getLevelConfig(currentLevel);
+            levelColors = currentLevelConfig.env;
+            levelEnv = currentLevelConfig.env;
+            
+            AudioEngine.init(); 
+            AudioEngine.click();
+            AudioEngine.startEngine();
+
+            player = { 
+                x: 0, z: 0, speed: 0, fuel: 100, coins: 0, nitro: 100, 
+                isBoosting: false, isAccelerating: false, isBraking: false,
+                distanceMeters: 0, level: currentLevel, crashes: 0, bonusScore: 0,
+                raceDistance: 0, lap: 0, steerAngle: 0
+            };
+
+            MAX_SPEED = MAX_SPEED_BASE * currentLevelConfig.speedMultiplier;
+            ACCEL = MAX_SPEED / 3.4;
+            crashCooldown = 0;
+            
+            buildTrack();
+            
+            // All other cars/traffic completely removed as requested for an open speedway!
+            cars = [];
+            currentRacePosition = 1;
+            countdownTimer = 2.0; // Quick, energetic launch: GO!
+            countdownStep = -1;
+            state = 'COUNTDOWN';
+            
+            document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('countdown-overlay').classList.remove('hidden');
+            
+            // Show mobile controls on touch / compact screens
+            if (window.matchMedia('(hover: none) and (pointer: coarse), (max-width: 860px)').matches) {
+                document.getElementById('mobile-controls').style.display = 'flex';
+            } else {
+                document.getElementById('mobile-controls').style.display = 'none';
+            }
+
+            updateHUD();
+            requestAnimationFrame(loop);
+        },
+
+        openLevelSelect: () => {
+            AudioEngine.click();
+            document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+            document.getElementById('menu-levelselect').classList.remove('hidden');
+            selectedWorldView = Math.floor((unlockedLevel - 1) / 10);
+            renderChapterTabs();
+            renderLevelsGrid(selectedWorldView);
+        },
+
+        closeLevelSelect: () => {
+            AudioEngine.click();
+            document.getElementById('menu-levelselect').classList.add('hidden');
+            document.getElementById('menu-main').classList.remove('hidden');
+        },
+
+        setCarColor: (color) => {
+            selectedCarColor = color;
+            SafeStorage.setString('turbo_car_color', color);
+            render();
+        },
+
+        togglePause: () => {
+            if (state === 'PLAYING' || state === 'COUNTDOWN') { 
+                state = 'PAUSED'; 
+                AudioEngine.stopEngine();
+                document.getElementById('menu-pause').classList.remove('hidden'); 
+            } else if (state === 'PAUSED') {
+                game.resume();
+            }
+        },
+
+        resume: () => { 
+            state = 'PLAYING'; 
+            AudioEngine.startEngine();
+            document.getElementById('menu-pause').classList.add('hidden'); 
+            requestAnimationFrame(loop); 
+        },
+        
+        nextLevel: () => {
+            AudioEngine.click();
+            const nextLvl = currentLevel + 1;
+            if (nextLvl > 120) {
+                game.start(1);
+            } else {
+                game.start(nextLvl);
+            }
+        },
+        
+        restartLevel: () => {
+            AudioEngine.click();
+            game.start(currentLevel);
+        },
+        
+        getUnlockedLevel: () => {
+            return unlockedLevel;
+        },
+
+        resize: () => {
+            WIDTH = window.innerWidth; 
+            HEIGHT = window.innerHeight;
+            canvas.width = WIDTH; 
+            canvas.height = HEIGHT;
+            if (state === 'MENU') {
+                render();
+            }
+        }
+    };
+})();
+
+// Attach event listeners once
+window.addEventListener('DOMContentLoaded', () => {
+    game.init();
+
+    // Resize and Orientation handling
+    window.addEventListener('resize', game.resize);
+    window.addEventListener('orientationchange', () => {
+        setTimeout(game.resize, 100);
+    });
+
+    // Tab visibility handling to prevent runaway physics
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            game.togglePause();
+        }
+    });
+
+    // Helper to bind buttons safely
+    const bindBtn = (id, fn) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            AudioEngine.init();
+            fn();
+        });
+    };
+
+    // Main Menu Actions
+    bindBtn('start-race-btn', () => game.start(1));
+    bindBtn('continue-btn', () => game.start(game.getUnlockedLevel()));
+    bindBtn('select-level-btn', () => game.openLevelSelect());
+    bindBtn('close-levelselect-btn', () => game.closeLevelSelect());
+
+    // Sound Toggle Button
+    const soundBtn = document.getElementById('sound-toggle-btn');
+    if (soundBtn) {
+        soundBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const isMuted = AudioEngine.toggleMute();
+            soundBtn.innerText = isMuted ? '🔇 SOUND: OFF' : '🔊 SOUND: ON';
+        });
+    }
+
+    // Garage Paint Selector Swatches
+    document.querySelectorAll('.paint-swatch').forEach(swatch => {
+        swatch.addEventListener('click', () => {
+            AudioEngine.init();
+            AudioEngine.click();
+            document.querySelectorAll('.paint-swatch').forEach(s => s.classList.remove('active'));
+            swatch.classList.add('active');
+            const col = swatch.getAttribute('data-color');
+            if (col) {
+                game.setCarColor(col);
+            }
+        });
+    });
+
+    // Pause
+    bindBtn('pause-btn', () => game.togglePause());
+    bindBtn('pause-resume-btn', () => game.resume());
+    bindBtn('pause-quit-btn', () => game.init());
+
+    // Game Over
+    bindBtn('go-retry-btn', () => game.restartLevel());
+    bindBtn('go-menu-btn', () => game.init());
+
+    // Level Complete
+    bindBtn('lc-next-btn', () => game.nextLevel());
+    bindBtn('lc-menu-btn', () => game.init());
+
+    // Level Failed
+    bindBtn('lf-retry-btn', () => game.restartLevel());
+    bindBtn('lf-menu-btn', () => game.init());
+});
+</script>
+
+</body>
+</html>
