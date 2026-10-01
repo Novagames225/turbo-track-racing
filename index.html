@@ -880,92 +880,58 @@
  */
 const PlayablesBridge = (() => {
     const inPlayables = () => typeof ytgame !== 'undefined' && !!ytgame.IN_PLAYABLES_ENV;
-    let loadFinished = false;
-    let loadSucceeded = false;
-    let loadPromise = null;
 
     const firstFrameReady = () => {
         try {
-            if (inPlayables() && ytgame.game) ytgame.game.firstFrameReady();
+            if (typeof ytgame !== 'undefined' && ytgame.game) ytgame.game.firstFrameReady();
         } catch (e) {}
     };
 
     const gameReady = () => {
         try {
-            if (inPlayables() && ytgame.game) ytgame.game.gameReady();
+            if (typeof ytgame !== 'undefined' && ytgame.game) ytgame.game.gameReady();
         } catch (e) {}
     };
 
-    const sendScore = async (value) => {
+    const sendScore = (value) => {
         try {
             const score = Math.max(0, Math.floor(Number(value) || 0));
             if (inPlayables() && ytgame.engagement) {
-                await ytgame.engagement.sendScore({ value: score });
+                ytgame.engagement.sendScore({ value: score }).catch(() => {});
+            }
+        } catch (e) {}
+    };
+
+    const saveData = (data) => {
+        try {
+            if (inPlayables() && ytgame.game && typeof data === 'string') {
+                const safe = data.length <= 3 * 1024 * 1024 ? data : data.slice(0, 3 * 1024 * 1024);
+                ytgame.game.saveData(safe).catch(() => {});
             }
         } catch (e) {}
     };
 
     const loadData = async () => {
-        if (loadPromise) return loadPromise;
-        loadPromise = (async () => {
-            try {
-                if (inPlayables() && ytgame.game) {
-                    const raw = await ytgame.game.loadData();
-                    loadSucceeded = true;
-                    loadFinished = true;
-                    return typeof raw === 'string' ? raw : '';
-                }
-            } catch (e) {
-                // A failed load must NOT be followed by saveData, because YouTube
-                // rejects saves until loadData has completed successfully.
-                loadFinished = true;
-                loadSucceeded = false;
-            }
-            return '';
-        })();
-        return loadPromise;
-    };
-
-    const saveData = async (data) => {
         try {
-            if (!inPlayables() || !ytgame.game || typeof data !== 'string') return false;
-
-            // YouTube requires loadData() to complete successfully before saveData().
-            if (!loadFinished) await loadData();
-            if (!loadSucceeded) return false;
-
-            // saveData requires a valid, well-formed UTF-16 string under 3 MiB.
-            const safe = typeof data.isWellFormed === 'function' && !data.isWellFormed()
-                ? data.toWellFormed()
-                : data;
-            const maxBytes = 3 * 1024 * 1024;
-            const bytes = new Blob([safe]).size;
-            if (bytes >= maxBytes) return false;
-
-            await ytgame.game.saveData(safe);
-            return true;
-        } catch (e) {
-            return false;
-        }
+            if (inPlayables() && ytgame.game) return await ytgame.game.loadData();
+        } catch (e) {}
+        return '';
     };
 
-    const setupSystemEvents = (pauseFn, resumeFn, saveFn) => {
+    const setupSystemEvents = (pauseFn, resumeFn) => {
         try {
             if (!inPlayables() || !ytgame.system) return;
-            if (typeof ytgame.system.onPause === 'function') {
-                ytgame.system.onPause(async () => { try { if (saveFn) await saveFn(); } catch (e) {} try { pauseFn(); } catch (e) {} });
-            }
-            if (typeof ytgame.system.onResume === 'function') {
-                ytgame.system.onResume(() => { try { resumeFn(); } catch (e) {} });
-            }
-            if (typeof ytgame.system.isAudioEnabled === 'function') {
-                try { if (!ytgame.system.isAudioEnabled()) AudioEngine.stopEngine(); } catch (e) {}
-            }
+            if (typeof ytgame.system.onPause === 'function') ytgame.system.onPause(() => { try { pauseFn(); } catch (e) {} });
+            if (typeof ytgame.system.onResume === 'function') ytgame.system.onResume(() => { try { resumeFn(); } catch (e) {} });
             if (typeof ytgame.system.onAudioEnabledChange === 'function') {
                 ytgame.system.onAudioEnabledChange((enabled) => {
                     try {
-                        if (enabled) AudioEngine.init();
-                        else AudioEngine.stopEngine();
+                        if (enabled) {
+                            // YouTube controls whether audio is allowed; game mute state remains user-controlled.
+                            AudioEngine.init();
+                        } else {
+                            AudioEngine.stopEngine();
+                        }
                     } catch (e) {}
                 });
             }
@@ -1501,8 +1467,12 @@ const game = (() => {
         };
     };
 
-    const saveProgress = async () => {
-        // Keep the payload tiny, deterministic, and backward-compatible.
+    const saveProgress = () => {
+        SafeStorage.setInt('turbo_unlocked', unlockedLevel);
+        SafeStorage.setInt('turbo_highscore', highscore);
+        SafeStorage.setInt('turbo_totalcoins', totalCoins);
+
+        // YouTube Playables cloud save. Keep this payload small and versioned.
         const cloudSave = JSON.stringify({
             version: 1,
             unlockedLevel: Math.max(1, Math.min(120, unlockedLevel)),
@@ -1510,17 +1480,7 @@ const game = (() => {
             totalCoins: Math.max(0, Math.floor(totalCoins)),
             carColor: selectedCarColor || '#00f2ff'
         });
-
-        // In Playables, YouTube cloud save is the progress store.
-        if (PlayablesBridge.inPlayables()) {
-            return await PlayablesBridge.saveData(cloudSave);
-        }
-
-        // Keep local persistence only for normal web/non-Playables use.
-        SafeStorage.setInt('turbo_unlocked', unlockedLevel);
-        SafeStorage.setInt('turbo_highscore', highscore);
-        SafeStorage.setInt('turbo_totalcoins', totalCoins);
-        return true;
+        PlayablesBridge.saveData(cloudSave);
     };
 
     const loadPlayablesProgress = async () => {
@@ -3181,11 +3141,8 @@ const game = (() => {
             stars = 2;
         }
         SafeStorage.setInt(`turbo_stars_lvl_${currentLevel}`, stars);
-        // Level completion is a material progress milestone: wait for cloud save
-        // before sending the score so the saved best score stays consistent.
-        saveProgress().then((saved) => {
-            if (saved) PlayablesBridge.sendScore(Math.max(0, Math.floor(highscore)));
-        });
+        saveProgress();
+        PlayablesBridge.sendScore(score);
         
         // Hide gameplay UI and pause
         document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
@@ -3475,17 +3432,24 @@ const game = (() => {
 
 // Attach event listeners once
 window.addEventListener('DOMContentLoaded', () => {
-    game.init().catch(() => {});
+    game.init();
     PlayablesBridge.setupSystemEvents(() => game.togglePause(), () => {
         // Resume only when the game was paused by YouTube.
         // The normal game state remains unchanged otherwise.
         game.resume();
-    }, saveProgress);
+    });
 
     // Resize and Orientation handling
     window.addEventListener('resize', game.resize);
     window.addEventListener('orientationchange', () => {
         setTimeout(game.resize, 100);
+    });
+
+    // Tab visibility handling to prevent runaway physics
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            game.togglePause();
+        }
     });
 
     // Helper to bind buttons safely
