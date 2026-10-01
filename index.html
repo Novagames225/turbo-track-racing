@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- YouTube Playables SDK: MUST load before game code -->
+    <script src="https://www.youtube.com/game_api/v1"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Turbo Track Racing</title>
@@ -872,6 +874,74 @@
 
 <script>
 /**
+ * YOUTUBE PLAYABLES INTEGRATION
+ * The SDK is loaded above before any game code. These helpers are no-ops
+ * outside the YouTube Playables environment.
+ */
+const PlayablesBridge = (() => {
+    const inPlayables = () => typeof ytgame !== 'undefined' && !!ytgame.IN_PLAYABLES_ENV;
+
+    const firstFrameReady = () => {
+        try {
+            if (typeof ytgame !== 'undefined' && ytgame.game) ytgame.game.firstFrameReady();
+        } catch (e) {}
+    };
+
+    const gameReady = () => {
+        try {
+            if (typeof ytgame !== 'undefined' && ytgame.game) ytgame.game.gameReady();
+        } catch (e) {}
+    };
+
+    const sendScore = (value) => {
+        try {
+            const score = Math.max(0, Math.floor(Number(value) || 0));
+            if (inPlayables() && ytgame.engagement) {
+                ytgame.engagement.sendScore({ value: score }).catch(() => {});
+            }
+        } catch (e) {}
+    };
+
+    const saveData = (data) => {
+        try {
+            if (inPlayables() && ytgame.game && typeof data === 'string') {
+                const safe = data.length <= 3 * 1024 * 1024 ? data : data.slice(0, 3 * 1024 * 1024);
+                ytgame.game.saveData(safe).catch(() => {});
+            }
+        } catch (e) {}
+    };
+
+    const loadData = async () => {
+        try {
+            if (inPlayables() && ytgame.game) return await ytgame.game.loadData();
+        } catch (e) {}
+        return '';
+    };
+
+    const setupSystemEvents = (pauseFn, resumeFn) => {
+        try {
+            if (!inPlayables() || !ytgame.system) return;
+            if (typeof ytgame.system.onPause === 'function') ytgame.system.onPause(() => { try { pauseFn(); } catch (e) {} });
+            if (typeof ytgame.system.onResume === 'function') ytgame.system.onResume(() => { try { resumeFn(); } catch (e) {} });
+            if (typeof ytgame.system.onAudioEnabledChange === 'function') {
+                ytgame.system.onAudioEnabledChange((enabled) => {
+                    try {
+                        if (enabled) {
+                            // YouTube controls whether audio is allowed; game mute state remains user-controlled.
+                            AudioEngine.init();
+                        } else {
+                            AudioEngine.stopEngine();
+                        }
+                    } catch (e) {}
+                });
+            }
+        } catch (e) {}
+    };
+
+    return { inPlayables, firstFrameReady, gameReady, sendScore, saveData, loadData, setupSystemEvents };
+})();
+
+/**
  * SAFE LOCAL STORAGE HELPER
  */
 const SafeStorage = {
@@ -1401,6 +1471,41 @@ const game = (() => {
         SafeStorage.setInt('turbo_unlocked', unlockedLevel);
         SafeStorage.setInt('turbo_highscore', highscore);
         SafeStorage.setInt('turbo_totalcoins', totalCoins);
+
+        // YouTube Playables cloud save. Keep this payload small and versioned.
+        const cloudSave = JSON.stringify({
+            version: 1,
+            unlockedLevel: Math.max(1, Math.min(120, unlockedLevel)),
+            highscore: Math.max(0, Math.floor(highscore)),
+            totalCoins: Math.max(0, Math.floor(totalCoins)),
+            carColor: selectedCarColor || '#00f2ff'
+        });
+        PlayablesBridge.saveData(cloudSave);
+    };
+
+    const loadPlayablesProgress = async () => {
+        const raw = await PlayablesBridge.loadData();
+        if (!raw) return;
+        try {
+            const data = JSON.parse(raw);
+            if (!data || typeof data !== 'object') return;
+            if (Number.isFinite(data.unlockedLevel)) {
+                unlockedLevel = Math.max(1, Math.min(120, Math.floor(data.unlockedLevel)));
+                SafeStorage.setInt('turbo_unlocked', unlockedLevel);
+            }
+            if (Number.isFinite(data.highscore)) {
+                highscore = Math.max(0, Math.floor(data.highscore));
+                SafeStorage.setInt('turbo_highscore', highscore);
+            }
+            if (Number.isFinite(data.totalCoins)) {
+                totalCoins = Math.max(0, Math.floor(data.totalCoins));
+                SafeStorage.setInt('turbo_totalcoins', totalCoins);
+            }
+            if (typeof data.carColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(data.carColor)) {
+                selectedCarColor = data.carColor;
+                SafeStorage.setString('turbo_car_color', selectedCarColor);
+            }
+        } catch (e) {}
     };
 
     const project = (p, cameraX, cameraY, cameraZ, width, height) => {
@@ -3037,6 +3142,7 @@ const game = (() => {
         }
         SafeStorage.setInt(`turbo_stars_lvl_${currentLevel}`, stars);
         saveProgress();
+        PlayablesBridge.sendScore(score);
         
         // Hide gameplay UI and pause
         document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
@@ -3161,7 +3267,9 @@ const game = (() => {
     };
 
     return {
-        init: () => {
+        init: async () => {
+            // Restore YouTube cloud progress before rendering the interactive menu.
+            await loadPlayablesProgress();
             state = 'MENU'; 
             AudioEngine.stopEngine();
             WIDTH = window.innerWidth; 
@@ -3195,6 +3303,12 @@ const game = (() => {
             document.getElementById('mobile-controls').style.display = 'none';
             
             render();
+
+            // The first canvas frame is now available. YouTube removes its loading state
+            // only after this required SDK notification.
+            PlayablesBridge.firstFrameReady();
+            PlayablesBridge.gameReady();
+
             requestAnimationFrame(loop);
         },
 
@@ -3319,6 +3433,11 @@ const game = (() => {
 // Attach event listeners once
 window.addEventListener('DOMContentLoaded', () => {
     game.init();
+    PlayablesBridge.setupSystemEvents(() => game.togglePause(), () => {
+        // Resume only when the game was paused by YouTube.
+        // The normal game state remains unchanged otherwise.
+        game.resume();
+    });
 
     // Resize and Orientation handling
     window.addEventListener('resize', game.resize);
