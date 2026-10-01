@@ -881,7 +881,6 @@
 const PlayablesBridge = (() => {
     const inPlayables = () => typeof ytgame !== 'undefined' && !!ytgame.IN_PLAYABLES_ENV;
     let loadFinished = false;
-    let loadSucceeded = false;
     let loadPromise = null;
 
     const firstFrameReady = () => {
@@ -911,15 +910,13 @@ const PlayablesBridge = (() => {
             try {
                 if (inPlayables() && ytgame.game) {
                     const raw = await ytgame.game.loadData();
-                    loadSucceeded = true;
                     loadFinished = true;
                     return typeof raw === 'string' ? raw : '';
                 }
             } catch (e) {
-                // A failed load must NOT be followed by saveData, because YouTube
-                // rejects saves until loadData has completed successfully.
+                // Treat a missing/temporarily unavailable save as an empty save,
+                // but do not allow saveData to run until this load attempt is complete.
                 loadFinished = true;
-                loadSucceeded = false;
             }
             return '';
         })();
@@ -928,32 +925,21 @@ const PlayablesBridge = (() => {
 
     const saveData = async (data) => {
         try {
-            if (!inPlayables() || !ytgame.game || typeof data !== 'string') return false;
-
-            // YouTube requires loadData() to complete successfully before saveData().
+            if (!inPlayables() || !ytgame.game || typeof data !== 'string') return;
+            // YouTube requires loadData() to finish before the first saveData().
             if (!loadFinished) await loadData();
-            if (!loadSucceeded) return false;
-
-            // saveData requires a valid, well-formed UTF-16 string under 3 MiB.
-            const safe = typeof data.isWellFormed === 'function' && !data.isWellFormed()
-                ? data.toWellFormed()
-                : data;
+            // Keep the payload comfortably below the 3 MiB hard limit.
             const maxBytes = 3 * 1024 * 1024;
-            const bytes = new Blob([safe]).size;
-            if (bytes >= maxBytes) return false;
-
+            const safe = data.length < maxBytes ? data : data.slice(0, maxBytes - 1);
             await ytgame.game.saveData(safe);
-            return true;
-        } catch (e) {
-            return false;
-        }
+        } catch (e) {}
     };
 
-    const setupSystemEvents = (pauseFn, resumeFn, saveFn) => {
+    const setupSystemEvents = (pauseFn, resumeFn) => {
         try {
             if (!inPlayables() || !ytgame.system) return;
             if (typeof ytgame.system.onPause === 'function') {
-                ytgame.system.onPause(async () => { try { if (saveFn) await saveFn(); } catch (e) {} try { pauseFn(); } catch (e) {} });
+                ytgame.system.onPause(() => { try { pauseFn(); } catch (e) {} });
             }
             if (typeof ytgame.system.onResume === 'function') {
                 ytgame.system.onResume(() => { try { resumeFn(); } catch (e) {} });
@@ -1502,7 +1488,11 @@ const game = (() => {
     };
 
     const saveProgress = async () => {
-        // Keep the payload tiny, deterministic, and backward-compatible.
+        SafeStorage.setInt('turbo_unlocked', unlockedLevel);
+        SafeStorage.setInt('turbo_highscore', highscore);
+        SafeStorage.setInt('turbo_totalcoins', totalCoins);
+
+        // YouTube Playables cloud save. Keep this payload tiny and versioned.
         const cloudSave = JSON.stringify({
             version: 1,
             unlockedLevel: Math.max(1, Math.min(120, unlockedLevel)),
@@ -1510,17 +1500,7 @@ const game = (() => {
             totalCoins: Math.max(0, Math.floor(totalCoins)),
             carColor: selectedCarColor || '#00f2ff'
         });
-
-        // In Playables, YouTube cloud save is the progress store.
-        if (PlayablesBridge.inPlayables()) {
-            return await PlayablesBridge.saveData(cloudSave);
-        }
-
-        // Keep local persistence only for normal web/non-Playables use.
-        SafeStorage.setInt('turbo_unlocked', unlockedLevel);
-        SafeStorage.setInt('turbo_highscore', highscore);
-        SafeStorage.setInt('turbo_totalcoins', totalCoins);
-        return true;
+        await PlayablesBridge.saveData(cloudSave);
     };
 
     const loadPlayablesProgress = async () => {
@@ -3183,9 +3163,7 @@ const game = (() => {
         SafeStorage.setInt(`turbo_stars_lvl_${currentLevel}`, stars);
         // Level completion is a material progress milestone: wait for cloud save
         // before sending the score so the saved best score stays consistent.
-        saveProgress().then((saved) => {
-            if (saved) PlayablesBridge.sendScore(Math.max(0, Math.floor(highscore)));
-        });
+        saveProgress().then(() => PlayablesBridge.sendScore(score));
         
         // Hide gameplay UI and pause
         document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
@@ -3480,7 +3458,7 @@ window.addEventListener('DOMContentLoaded', () => {
         // Resume only when the game was paused by YouTube.
         // The normal game state remains unchanged otherwise.
         game.resume();
-    }, saveProgress);
+    });
 
     // Resize and Orientation handling
     window.addEventListener('resize', game.resize);
